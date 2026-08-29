@@ -1,0 +1,1037 @@
+#!/bin/bash
+# ==============================================================================
+#  ASISTENTE NAS & BACKUP EMPRESARIAL • EAD-COL (DEBIAN 13)
+# ==============================================================================
+
+# Forzar ejecución con privilegios de root
+if [ "$EUID" -ne 0 ]; then
+  echo "[-] Este asistente requiere privilegios de administrador."
+  echo "    Ejecutando: sudo bash $0"
+  exec sudo bash "$0" "$@"
+fi
+
+# Restablecer colores nativos estándar
+unset NEWT_COLORS
+
+# Colores ANSI para terminal
+C_CYAN="\033[1;36m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_RED="\033[1;31m"
+C_WHITE="\033[1;37m"
+C_GRAY="\033[0;90m"
+C_BOLD="\033[1m"
+C_RESET="\033[0m"
+
+APP_TITLE="SERVIDOR NAS & BACKUP • EAD-COL"
+
+mkdir -p /etc/backup-credentials /mnt/backup_sources /srv/nas/BACKUPS_HISTORICOS /srv/nas/LOGS_BACKUP /usr/local/bin
+chmod 700 /etc/backup-credentials
+
+# ==============================================================================
+# 1. FUNCIÓN: ASISTENTE DE DESPLIEGUE GUIADO (ARCHIVOS O BACKUP)
+# ==============================================================================
+instalar_nas() {
+    ROL_SERVER=$(whiptail --title "Paso 1 de 5: Rol del Servidor" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --menu "Selecciona la función principal que tendrá este servidor:" 15 72 2 \
+        "ARCHIVOS" "Servidor NAS de Archivos (Departamentos y Campañas)" \
+        "BACKUP"   "Servidor de Copias de Seguridad (Central de Respaldos)" 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$ROL_SERVER" ]; then return; fi
+
+    DEFAULT_NETBIOS="SRV-EAD-NAS"
+    [ "$ROL_SERVER" == "BACKUP" ] && DEFAULT_NETBIOS="SRV-EAD-BKP"
+
+    DISCO_SELECCIONADO=$(whiptail --title "Paso 2 de 5: Disco de Almacenamiento" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --radiolist "Selecciona el disco dedicado que contendrá los datos ($ROL_SERVER):" 15 72 3 \
+        "/dev/sdb" "Disco Secundario (Recomendado 2 TB)" ON \
+        "/dev/sda" "Disco del Sistema Operativo (NO RECOMENDADO)" OFF 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$DISCO_SELECCIONADO" ]; then return; fi
+
+    SMB_NETBIOS=$(whiptail --title "Paso 3 de 5: Nombre del Servidor" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --inputbox "Ingresa el nombre de red NetBIOS para este servidor:" 10 65 "$DEFAULT_NETBIOS" 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$SMB_NETBIOS" ]; then return; fi
+
+    SMB_WORKGROUP=$(whiptail --title "Paso 3 de 5: Grupo de Trabajo" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --inputbox "Ingresa el nombre del Grupo de Trabajo (Workgroup):" 10 65 "EAD-COL" 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$SMB_WORKGROUP" ]; then return; fi
+
+    USUARIO_ACTUAL="${SUDO_USER:-$(logname 2>/dev/null || echo "nas")}"
+    [ "$USUARIO_ACTUAL" == "root" ] && USUARIO_ACTUAL="nas"
+
+    OPCION_USER=$(whiptail --title "Paso 4 de 5: Administrador de Cockpit" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --menu "Selecciona la cuenta que administrará el panel web Cockpit y el servidor:" 14 70 2 \
+        "1" "Usar usuario actual: [$USUARIO_ACTUAL] (Recomendado)" \
+        "2" "Crear o especificar otro usuario administrador" 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$OPCION_USER" ]; then return; fi
+
+    ADMIN_USER="$USUARIO_ACTUAL"
+    if [ "$OPCION_USER" == "2" ]; then
+        ADMIN_USER=$(whiptail --title "Nuevo Administrador" \
+            --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+            --inputbox "Ingresa el nombre de usuario para el administrador de Cockpit:" 10 65 "admin_nas" 3>&1 1>&2 2>&3)
+        if [ $? -ne 0 ] || [ -z "$ADMIN_USER" ]; then return; fi
+    fi
+
+    ADMIN_PASS=$(whiptail --title "Contraseña de Administrador" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --passwordbox "Ingresa la contraseña para $ADMIN_USER (Linux, Sudo y Samba):" 10 65 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$ADMIN_PASS" ]; then
+        whiptail --title "Error" --ok-button "< Aceptar >" --msgbox "La contraseña no puede estar vacía." 8 45
+        return
+    fi
+
+    RESUMEN="PARAMETROS DE CONFIGURACION:
+* Funcion Principal    : $ROL_SERVER
+* Disco Almacenamiento : $DISCO_SELECCIONADO (Se formateara en EXT4)
+* Nombre del Servidor  : $SMB_NETBIOS
+* Grupo de Trabajo     : $SMB_WORKGROUP
+* Administrador Web    : $ADMIN_USER (Permisos sudo totales)
+
+INCLUYE PARCHES AUTOMATICOS:
+- Integracion Cockpit File Sharing y difusion WSDD2
+- Wrappers de compatibilidad en espanol (chage / passwd / lastb)
+- Herramientas multiplataforma de Backup (CIFS, Rsync, SSHPass, Cron)
+
+¿Confirmas el formateo del disco y el despliegue completo?"
+
+    if (whiptail --title "Paso 5 de 5: Confirmación Crítica" \
+        --yes-button "< Sí, Iniciar Despliegue >" --no-button "< Cancelar >" \
+        --yesno "$RESUMEN" 20 74); then
+        
+        clear
+        echo -e "${C_CYAN}"
+        echo "  ╭──────────────────────────────────────────────────────────────────────╮"
+        echo "  │        INICIANDO DESPLIEGUE AUTOMATIZADO DEL SERVIDOR ($ROL_SERVER)   │"
+        echo "  ╰──────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+        
+        bash /home/nas/ejecutar_configuracion_ead.sh "$DISCO_SELECCIONADO" "$SMB_WORKGROUP" "$SMB_NETBIOS" "$ADMIN_USER" "$ADMIN_PASS" "$ROL_SERVER"
+        
+        whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
+            --msgbox "✔ ¡Despliegue completado con éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://10.10.1.2:9090\n• Usuario Cockpit: $ADMIN_USER\n• Red Windows:     \\\\10.10.1.2 (o \\\\$SMB_NETBIOS)" 13 70
+    fi
+}
+
+# ==============================================================================
+# 2. FUNCIÓN: GESTIÓN DE GRUPOS DE SEGURIDAD
+# ==============================================================================
+gestionar_grupos() {
+    while true; do
+        OPC_GRP=$(whiptail --title "$APP_TITLE" \
+            --ok-button "< Seleccionar >" --cancel-button "< Volver >" \
+            --menu "GESTIÓN DE GRUPOS DE SEGURIDAD:" 16 68 4 \
+            "1" "[*] Listar grupos existentes" \
+            "2" "[+] Crear un nuevo grupo" \
+            "3" "[-] Eliminar un grupo existente" \
+            "4" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        if [ $? -ne 0 ] || [ "$OPC_GRP" == "4" ]; then
+            break
+        fi
+
+        case "$OPC_GRP" in
+            1)
+                GRUPOS_TXT=$(awk -F: '/^grp_/ {printf "  %-22s | GID: %-5s | Miembros: %s\n", $1, $3, ($4==""?"(Sin miembros)":$4)}' /etc/group)
+                [ -z "$GRUPOS_TXT" ] && GRUPOS_TXT="  (No hay grupos con prefijo grp_ creados)"
+                HEADER="  GRUPO                  | GID   | MIEMBROS\n  ─────────────────────────────────────────────────────────────────\n"
+                whiptail --title "Grupos de Seguridad Registrados" --ok-button "< Aceptar >" --msgbox "${HEADER}${GRUPOS_TXT}" 18 72
+                ;;
+            2)
+                NUEVO_GRP=$(whiptail --title "$APP_TITLE" \
+                    --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ingresa el nombre del nuevo grupo (ej. grp_contabilidad):" 10 60 "grp_" 3>&1 1>&2 2>&3)
+                
+                if [ $? -eq 0 ] && [ -n "$NUEVO_GRP" ] && [ "$NUEVO_GRP" != "grp_" ]; then
+                    if (whiptail --title "Confirmación" \
+                        --yes-button "< Sí, Crear Grupo >" --no-button "< Cancelar >" \
+                        --yesno "¿Estás seguro de que deseas crear el grupo de seguridad \"$NUEVO_GRP\" en el sistema?" 10 65); then
+                        groupadd -f "$NUEVO_GRP"
+                        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" --msgbox "✔ Grupo \"$NUEVO_GRP\" creado correctamente." 8 50
+                    fi
+                fi
+                ;;
+            3)
+                DEL_GRP=$(whiptail --title "$APP_TITLE" \
+                    --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ingresa el nombre del grupo que deseas eliminar:" 10 60 3>&1 1>&2 2>&3)
+                
+                if [ $? -eq 0 ] && [ -n "$DEL_GRP" ]; then
+                    if (whiptail --title "Confirmación de Eliminación" \
+                        --yes-button "< Sí, Eliminar Grupo >" --no-button "< Cancelar >" \
+                        --yesno "¿Estás seguro de que deseas eliminar permanentemente el grupo \"$DEL_GRP\"?" 10 65); then
+                        if groupdel "$DEL_GRP" 2>/dev/null; then
+                            whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" --msgbox "✔ Grupo \"$DEL_GRP\" eliminado exitosamente." 8 50
+                        else
+                            whiptail --title "Error" --ok-button "< Aceptar >" --msgbox "✖ No se pudo eliminar el grupo \"$DEL_GRP\" (Verifique que exista)." 8 55
+                        fi
+                    fi
+                fi
+                ;;
+        esac
+    done
+}
+
+# ==============================================================================
+# 3. FUNCIÓN: GESTIÓN DE RECURSOS COMPARTIDOS (CARPETAS EN RED)
+# ==============================================================================
+gestionar_recursos_compartidos() {
+    while true; do
+        OPC_REC=$(whiptail --title "$APP_TITLE" \
+            --ok-button "< Seleccionar >" --cancel-button "< Volver >" \
+            --menu "GESTIÓN DE RECURSOS COMPARTIDOS (SAMBA):" 16 70 5 \
+            "1" "[*] Listar y ver detalles de recursos compartidos" \
+            "2" "[+] Crear un nuevo recurso compartido" \
+            "3" "[#] Deshabilitar / Habilitar un recurso existente" \
+            "4" "[-] Eliminar un recurso compartido de la red" \
+            "5" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        if [ $? -ne 0 ] || [ "$OPC_REC" == "5" ]; then
+            break
+        fi
+
+        case "$OPC_REC" in
+            1)
+                LISTA_DETALLADA=$(python3 -c '
+import re
+with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
+    lines = f.readlines()
+shares = {}
+current = None
+for line in lines:
+    m = re.match(r"^\s*\[([A-Za-z0-9_]+)\]", line)
+    if m:
+        sec = m.group(1)
+        if sec.lower() != "global":
+            current = sec
+            shares[current] = {"path": "N/A", "valid_users": "Todos", "available": "yes"}
+        else:
+            current = None
+    elif current and "=" in line:
+        k, v = line.split("=", 1)
+        k, v = k.strip().lower(), v.strip()
+        if k == "path": shares[current]["path"] = v
+        elif k == "valid users": shares[current]["valid_users"] = v
+        elif k == "available": shares[current]["available"] = v
+
+for name, d in shares.items():
+    st = "[ACTIVO]" if d["available"] != "no" else "[DESHABILITADO]"
+    print(f" {st} [{name}]\n   • Ruta:   {d[\"path\"]}\n   • Acceso: {d[\"valid_users\"]}\n")
+')
+                [ -z "$LISTA_DETALLADA" ] && LISTA_DETALLADA="No hay recursos compartidos configurados."
+                whiptail --title "Recursos Compartidos Activos en el NAS" --ok-button "< Aceptar >" --msgbox "$LISTA_DETALLADA" 21 76
+                ;;
+
+            2)
+                NOMBRE_SHARE=$(whiptail --title "$APP_TITLE" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ingresa el nombre del recurso para Windows (ej. VENTAS o BACKUPS):" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$NOMBRE_SHARE" ]; then continue; fi
+
+                NOMBRE_SHARE=$(echo "$NOMBRE_SHARE" | tr " " "_" | tr -cd "A-Za-z0-9_-")
+                RUTA_SHARE=$(whiptail --title "$APP_TITLE" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ruta física en el disco del servidor:" 10 65 "/srv/nas/$NOMBRE_SHARE" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$RUTA_SHARE" ]; then continue; fi
+
+                COMENTARIO=$(whiptail --title "$APP_TITLE" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Descripción o comentario del recurso:" 10 65 "Carpeta compartida $NOMBRE_SHARE" 3>&1 1>&2 2>&3)
+                [ -z "$COMENTARIO" ] && COMENTARIO="Carpeta compartida $NOMBRE_SHARE"
+
+                TIPO_PERM=$(whiptail --title "Esquema de Seguridad" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el nivel de acceso para este recurso:" 14 68 3 \
+                    "1" "Lectura y Escritura para grupos específicos" \
+                    "2" "Solo Lectura General (Escritura exclusiva para TI)" \
+                    "3" "Acceso Público (Lectura y Escritura libre)" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$TIPO_PERM" ]; then continue; fi
+
+                GRUPO_DUENO="grp_sistemas"
+                VALID_USERS="@grp_sistemas"
+                WRITE_LIST=""
+                READ_ONLY="no"
+                GUEST_OK="no"
+                MASK="0770"
+                TIPO_TXT="Lectura y Escritura por Grupo"
+
+                case "$TIPO_PERM" in
+                    1)
+                        GRUPOS_DISP=$(grep -E "^grp_" /etc/group | cut -d: -f1)
+                        LISTA_OPCIONES=""
+                        for g in $GRUPOS_DISP; do
+                            LISTA_OPCIONES="$LISTA_OPCIONES $g $g OFF"
+                        done
+
+                        GRUPOS_SELEC=$(whiptail --title "Grupos Autorizados" \
+                            --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
+                            --checklist "Marca con ESPACIO los grupos autorizados para este recurso:" 18 68 8 \
+                            $LISTA_OPCIONES 3>&1 1>&2 2>&3)
+
+                        if [ -z "$GRUPOS_SELEC" ]; then
+                            whiptail --ok-button "< Aceptar >" --msgbox "Debes seleccionar al menos un grupo." 8 45
+                            continue
+                        fi
+
+                        GRUPOS_LIMPIOS=$(echo "$GRUPOS_SELEC" | tr -d '\"')
+                        VALID_USERS="@grp_sistemas"
+                        for g in $GRUPOS_LIMPIOS; do
+                            VALID_USERS="$VALID_USERS, @$g"
+                            GRUPO_DUENO="$g"
+                        done
+                        ;;
+                    2)
+                        TIPO_TXT="Solo Lectura (Escritura solo TI)"
+                        VALID_USERS="@grp_empleados_ead, @grp_sistemas"
+                        WRITE_LIST="@grp_sistemas"
+                        READ_ONLY="yes"
+                        MASK="0775"
+                        ;;
+                    3)
+                        TIPO_TXT="Acceso Público Abierto"
+                        GUEST_OK="yes"
+                        READ_ONLY="no"
+                        MASK="0777"
+                        VALID_USERS=""
+                        ;;
+                esac
+
+                if (whiptail --title "Confirmar Creación de Recurso" \
+                    --yes-button "< Sí, Crear Recurso >" --no-button "< Cancelar >" \
+                    --yesno "¿Confirmas la creación del recurso con los siguientes parámetros?\n\n• Nombre:   [$NOMBRE_SHARE]\n• Ruta:     $RUTA_SHARE\n• Tipo:     $TIPO_TXT\n• Acceso:   ${VALID_USERS:-Todos}" 13 68); then
+                    
+                    mkdir -p "$RUTA_SHARE"
+                    if [ "$TIPO_PERM" == "1" ]; then
+                        chown -R root:"$GRUPO_DUENO" "$RUTA_SHARE"
+                        chmod -R 2770 "$RUTA_SHARE"
+                    elif [ "$TIPO_PERM" == "2" ]; then
+                        chown -R root:grp_sistemas "$RUTA_SHARE"
+                        chmod -R 2775 "$RUTA_SHARE"
+                    elif [ "$TIPO_PERM" == "3" ]; then
+                        chown -R nobody:nogroup "$RUTA_SHARE"
+                        chmod -R 0777 "$RUTA_SHARE"
+                    fi
+
+                    cat << SMBCONF >> /etc/samba/smb.conf
+
+# ==============================================================================
+# RECURSO COMPARTIDO: $NOMBRE_SHARE
+# ==============================================================================
+[$NOMBRE_SHARE]
+   comment = $COMENTARIO
+   path = $RUTA_SHARE
+   browseable = yes
+   read only = $READ_ONLY
+   guest ok = $GUEST_OK
+$([ -n "$VALID_USERS" ] && echo "   valid users = $VALID_USERS")
+$([ -n "$WRITE_LIST" ] && echo "   write list = $WRITE_LIST")
+   create mask = $MASK
+   directory mask = $MASK
+   force create mode = $MASK
+   force directory mode = $MASK
+SMBCONF
+                    testparm -s &>/dev/null
+                    smbcontrol all reload-config 2>/dev/null || systemctl reload smbd
+                    whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                        --msgbox "✔ ¡Recurso \"[$NOMBRE_SHARE]\" creado con éxito!\n\nRuta: $RUTA_SHARE\n\nAccesible desde Windows en: \\\\10.10.1.2\\$NOMBRE_SHARE" 12 70
+                fi
+                ;;
+
+            3)
+                LISTA_SHARES=$(python3 -c '
+import re
+with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
+    text = f.read()
+for m in re.finditer(r"\[([A-Za-z0-9_]+)\]", text):
+    s = m.group(1)
+    if s.lower() != "global":
+        sec_start = m.start()
+        next_sec = text.find("[", sec_start + 1)
+        block = text[sec_start:next_sec] if next_sec != -1 else text[sec_start:]
+        st = "[DESHABILITADO]" if "available = no" in block else "[ACTIVO]"
+        print(f"{s} {st}")
+')
+                if [ -z "$LISTA_SHARES" ]; then
+                    whiptail --ok-button "< Aceptar >" --msgbox "No hay recursos compartidos disponibles." 8 45
+                    continue
+                fi
+
+                MENU_ITEMS=""
+                while read -r name status; do
+                    MENU_ITEMS="$MENU_ITEMS $name $status"
+                done <<< "$LISTA_SHARES"
+
+                TARGET_SHARE=$(whiptail --title "Alternar Estado de Recurso" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el recurso para conmutar su estado en la red:" 18 70 8 \
+                    $MENU_ITEMS 3>&1 1>&2 2>&3)
+
+                if [ $? -eq 0 ] && [ -n "$TARGET_SHARE" ]; then
+                    if (whiptail --title "Confirmar Cambio de Estado" \
+                        --yes-button "< Sí, Cambiar Estado >" --no-button "< Cancelar >" \
+                        --yesno "¿Estás seguro de que deseas conmutar el estado del recurso \"[$TARGET_SHARE]\" en la red?" 10 68); then
+                        
+                        NUEVO_ESTADO=$(python3 -c '
+import sys, re
+target = sys.argv[1]
+with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
+    text = f.read()
+
+pattern = re.compile(rf"(\[{target}\][\s\S]*?)(?=\n\[|\Z)")
+m = pattern.search(text)
+if m:
+    block = m.group(1)
+    if "available = no" in block:
+        block = block.replace("available = no\n", "").replace("browseable = no", "browseable = yes")
+        msg = "HABILITADO (En línea)"
+    else:
+        block = block.replace("browseable = yes", "browseable = no")
+        if "browseable = no" not in block:
+            block = block.replace(f"[{target}]\n", f"[{target}]\n   browseable = no\n")
+        block = block.replace(f"[{target}]\n", f"[{target}]\n   available = no\n")
+        msg = "DESHABILITADO (Fuera de línea)"
+    text = text[:m.start()] + block + text[m.end():]
+    with open("/etc/samba/smb.conf", "w", encoding="utf-8") as f:
+        f.write(text)
+    print(msg)
+' "$TARGET_SHARE")
+                        testparm -s &>/dev/null
+                        smbcontrol all reload-config 2>/dev/null || systemctl reload smbd
+                        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" --msgbox "✔ El recurso \"[$TARGET_SHARE]\" ahora está:\n$NUEVO_ESTADO" 9 55
+                    fi
+                fi
+                ;;
+
+            4)
+                LISTA_ELIMINAR=$(grep -E "^\[" /etc/samba/smb.conf | grep -v "global" | tr -d "[]")
+                if [ -z "$LISTA_ELIMINAR" ]; then
+                    whiptail --ok-button "< Aceptar >" --msgbox "No hay recursos disponibles para eliminar." 8 45
+                    continue
+                fi
+
+                MENU_DEL=""
+                for s in $LISTA_ELIMINAR; do
+                    MENU_DEL="$MENU_DEL $s Recurso_Samba"
+                done
+
+                SHARE_A_BORRAR=$(whiptail --title "Eliminar Recurso Compartido" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el recurso que deseas eliminar definitivamente:" 18 70 8 \
+                    $MENU_DEL 3>&1 1>&2 2>&3)
+
+                if [ $? -eq 0 ] && [ -n "$SHARE_A_BORRAR" ]; then
+                    if (whiptail --title "Confirmación de Eliminación" \
+                        --yes-button "< Sí, Eliminar Recurso >" --no-button "< Cancelar >" \
+                        --yesno "¿Estás 100% seguro de eliminar la definición del recurso \"[$SHARE_A_BORRAR]\" de la red Samba?\n\n(Nota: Los archivos físicos en el disco se mantendrán protegidos)." 11 68); then
+                        
+                        python3 -c '
+import sys, re
+target = sys.argv[1]
+with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
+    text = f.read()
+
+text = re.sub(rf"# =+\n# RECURSO COMPARTIDO: {target}\n# =+\n", "", text)
+text = re.sub(rf"\[{target}\][\s\S]*?(?=\n\[|\Z)", "", text)
+
+with open("/etc/samba/smb.conf", "w", encoding="utf-8") as f:
+    f.write(text.strip() + "\n")
+' "$SHARE_A_BORRAR"
+                        testparm -s &>/dev/null
+                        smbcontrol all reload-config 2>/dev/null || systemctl reload smbd
+                        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" --msgbox "✔ El recurso \"[$SHARE_A_BORRAR]\" ha sido eliminado de la red Samba." 8 60
+                    fi
+                fi
+                ;;
+        esac
+    done
+}
+
+# ==============================================================================
+# 4. FUNCIÓN: GESTIÓN DE TAREAS DE BACKUP (CON BUCLE DE EDICIÓN CONTINUA)
+# ==============================================================================
+gestionar_backups() {
+    while true; do
+        OPC_BKP=$(whiptail --title "$APP_TITLE" \
+            --ok-button "< Seleccionar >" --cancel-button "< Volver >" \
+            --menu "GESTIÓN DE TAREAS DE BACKUP (WINDOWS & LINUX):" 16 72 5 \
+            "1" "[*] Listar tareas de backup programadas" \
+            "2" "[+] Crear nueva tarea de backup automatizada" \
+            "3" "[>] Ejecutar una tarea de backup ahora manualmente" \
+            "4" "[-] Eliminar una tarea de backup programada" \
+            "5" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        if [ $? -ne 0 ] || [ "$OPC_BKP" == "5" ]; then
+            break
+        fi
+
+        case "$OPC_BKP" in
+            1)
+                TAREAS_TXT=""
+                for f in /etc/cron.d/backup_*; do
+                    if [ -f "$f" ]; then
+                        NAME=$(basename "$f" | sed "s/backup_//")
+                        CRON_LINE=$(grep -v "^#" "$f" | grep -v "^$" | head -n 1)
+                        SCRIPT_PATH="/usr/local/bin/backup_${NAME}.sh"
+                        ORIGEN_T=$(grep "^# ORIGEN_DESC=" "$SCRIPT_PATH" 2>/dev/null | cut -d= -f2- || echo "N/A")
+                        TIPO_T=$(grep "^# TIPO_DESC=" "$SCRIPT_PATH" 2>/dev/null | cut -d= -f2- || echo "Incremental")
+                        DEST_T=$(grep "^DESTINO=" "$SCRIPT_PATH" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "N/A")
+                        TAREAS_TXT+="* TAREA: [${NAME}] (${TIPO_T})\n  - Origen:  ${ORIGEN_T}\n  - Destino: ${DEST_T}\n  - Horario: ${CRON_LINE}\n\n"
+                    fi
+                done
+                [ -z "$TAREAS_TXT" ] && TAREAS_TXT="No hay tareas de backup automatizadas creadas actualmente."
+                whiptail --title "Tareas de Backup Programadas" --ok-button "< Aceptar >" --msgbox "$TAREAS_TXT" 19 75
+                ;;
+
+            2)
+                # Paso 1: Nombre de la Tarea
+                NAME_BKP=$(whiptail --title "Paso 1: Nombre de la Tarea" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ingresa un nombre identificador para la tarea (ej. bkp_win_srv01 o bkp_linux_nas):" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$NAME_BKP" ]; then continue; fi
+                NAME_BKP=$(echo "$NAME_BKP" | tr " " "_" | tr -cd "A-Za-z0-9_-")
+
+                # Paso 2: Plataforma de Origen
+                PLAT_ORIGEN=$(whiptail --title "Paso 2: Plataforma de Origen" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el tipo de servidor o recurso de origen a respaldar:" 15 72 3 \
+                    "1" "🖥️ Servidor Windows (Recurso Compartido SMB / CIFS con Clave)" \
+                    "2" "🐧 Servidor Linux Remoto (Túnel SSH / Rsync con Clave)" \
+                    "3" "💾 Carpeta Local del Servidor" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$PLAT_ORIGEN" ]; then continue; fi
+
+                CRED_FILE="/etc/backup-credentials/${NAME_BKP}.cred"
+                MNT_POINT="/mnt/backup_sources/${NAME_BKP}"
+                ORIGEN_DESC=""
+                PRE_CMD=""
+                POST_CMD=""
+                ORIGEN_PATH=""
+                CANCEL_FLAG=0
+
+                case "$PLAT_ORIGEN" in
+                    1)
+                        # Servidor Windows con Bucle de Reintento / Edición
+                        WIN_IP="10.10.1.4"
+                        WIN_SHARE="Users"
+                        WIN_USER="Administrador"
+                        WIN_PASS=""
+                        WIN_DOM=""
+
+                        while true; do
+                            WIN_IP=$(whiptail --title "Servidor Windows (1/5)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --inputbox "Ingresa la Dirección IP del Servidor Windows:" 10 65 "$WIN_IP" 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$WIN_IP" ]; then CANCEL_FLAG=1; break; fi
+
+                            WIN_SHARE=$(whiptail --title "Recurso Windows Compartido (2/5)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --inputbox "Ingresa el nombre del recurso compartido en Windows (ej. Users o Contabilidad):" 10 65 "$WIN_SHARE" 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$WIN_SHARE" ]; then CANCEL_FLAG=1; break; fi
+
+                            WIN_USER=$(whiptail --title "Usuario Windows (3/5)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --inputbox "Ingresa el usuario de Windows con permisos de lectura:" 10 65 "$WIN_USER" 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$WIN_USER" ]; then CANCEL_FLAG=1; break; fi
+
+                            WIN_PASS=$(whiptail --title "Contraseña Windows (4/5)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --passwordbox "Ingresa la contraseña para $WIN_USER:" 10 65 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$WIN_PASS" ]; then CANCEL_FLAG=1; break; fi
+
+                            WIN_DOM=$(whiptail --title "Dominio (5/5) (Opcional)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --inputbox "Ingresa el Dominio Windows (deja en blanco si es grupo de trabajo):" 10 65 "$WIN_DOM" 3>&1 1>&2 2>&3)
+
+                            # Test de Conexión en Vivo
+                            mkdir -p "$MNT_POINT"
+                            TEST_CRED="/tmp/test_bkp_$$.cred"
+                            cat << EOF_TEST > "$TEST_CRED"
+username=$WIN_USER
+password=$WIN_PASS
+$([ -n "$WIN_DOM" ] && echo "domain=$WIN_DOM")
+EOF_TEST
+                            chmod 600 "$TEST_CRED"
+
+                            whiptail --title "Probando Conexión" --infobox "Verificando acceso a //$WIN_IP/$WIN_SHARE..." 7 55
+                            if mount -t cifs "//$WIN_IP/$WIN_SHARE" "$MNT_POINT" -o credentials="$TEST_CRED",ro,iocharset=utf8 2>/tmp/cifs_err.log; then
+                                umount "$MNT_POINT" 2>/dev/null || true
+                                rm -f "$TEST_CRED" /tmp/cifs_err.log
+                                whiptail --title "Conexión Exitosa" --ok-button "< Continuar >" \
+                                    --msgbox "✔ ¡Conexión con Windows establecida con éxito!\n\nSe verificó el acceso a //$WIN_IP/$WIN_SHARE y las credenciales." 9 65
+                                break
+                            else
+                                ERR_MSG=$(cat /tmp/cifs_err.log 2>/dev/null || echo "Fallo de conexión")
+                                rm -f "$TEST_CRED" /tmp/cifs_err.log
+                                
+                                if (whiptail --title "Error de Conexión" \
+                                    --yes-button "< Corregir Datos >" --no-button "< Cancelar >" \
+                                    --yesno "✖ No se pudo conectar a //$WIN_IP/$WIN_SHARE.\n\nDetalle:\n$ERR_MSG\n\n¿Deseas editar y corregir la IP, recurso, usuario o clave ahora?" 16 68); then
+                                    continue
+                                else
+                                    CANCEL_FLAG=1
+                                    break
+                                fi
+                            fi
+                        done
+
+                        if [ "$CANCEL_FLAG" -eq 1 ]; then continue; fi
+
+                        # Guardar credencial definitiva protegida 0600
+                        cat << EOF_CRED > "$CRED_FILE"
+username=$WIN_USER
+password=$WIN_PASS
+$([ -n "$WIN_DOM" ] && echo "domain=$WIN_DOM")
+EOF_CRED
+                        chmod 600 "$CRED_FILE"
+
+                        ORIGEN_DESC="Windows: //$WIN_IP/$WIN_SHARE (Usuario: $WIN_USER)"
+                        ORIGEN_PATH="$MNT_POINT"
+                        PRE_CMD="mount -t cifs \"//$WIN_IP/$WIN_SHARE\" \"$MNT_POINT\" -o credentials=\"$CRED_FILE\",ro,iocharset=utf8,vers=3.0"
+                        POST_CMD="umount \"$MNT_POINT\" 2>/dev/null || true"
+                        ;;
+
+                    2)
+                        # Servidor Linux con Bucle de Reintento / Edición
+                        LNX_IP="10.10.1.2"
+                        LNX_PATH="/srv/nas"
+                        LNX_USER="root"
+                        LNX_PASS=""
+
+                        while true; do
+                            LNX_IP=$(whiptail --title "Servidor Linux Remoto (1/4)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --inputbox "Ingresa la Dirección IP del Servidor Linux / NAS Remoto:" 10 65 "$LNX_IP" 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$LNX_IP" ]; then CANCEL_FLAG=1; break; fi
+
+                            LNX_PATH=$(whiptail --title "Ruta Remota en Linux (2/4)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --inputbox "Ingresa la ruta remota a respaldar (ej. /srv/nas o /var/www):" 10 65 "$LNX_PATH" 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$LNX_PATH" ]; then CANCEL_FLAG=1; break; fi
+
+                            LNX_USER=$(whiptail --title "Usuario SSH (3/4)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --inputbox "Ingresa el usuario SSH con permisos:" 10 65 "$LNX_USER" 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$LNX_USER" ]; then CANCEL_FLAG=1; break; fi
+
+                            LNX_PASS=$(whiptail --title "Contraseña SSH (4/4)" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                                --passwordbox "Ingresa la contraseña SSH para $LNX_USER@$LNX_IP:" 10 65 3>&1 1>&2 2>&3)
+                            if [ $? -ne 0 ] || [ -z "$LNX_PASS" ]; then CANCEL_FLAG=1; break; fi
+
+                            # Test de Conexión SSH
+                            whiptail --title "Probando Conexión" --infobox "Verificando acceso SSH a $LNX_USER@$LNX_IP..." 7 55
+                            if sshpass -p "$LNX_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 "$LNX_USER@$LNX_IP" "test -d $LNX_PATH" 2>/dev/null; then
+                                whiptail --title "Conexión Exitosa" --ok-button "< Continuar >" \
+                                    --msgbox "✔ ¡Conexión SSH establecida con éxito!\n\nSe verificó el acceso y la ruta remota $LNX_PATH." 9 65
+                                break
+                            else
+                                if (whiptail --title "Error de Conexión SSH" \
+                                    --yes-button "< Corregir Datos >" --no-button "< Cancelar >" \
+                                    --yesno "✖ No se pudo conectar vía SSH a $LNX_USER@$LNX_IP o la ruta $LNX_PATH no existe.\n\n¿Deseas editar y corregir la IP, usuario, clave o ruta ahora?" 13 68); then
+                                    continue
+                                else
+                                    CANCEL_FLAG=1
+                                    break
+                                fi
+                            fi
+                        done
+
+                        if [ "$CANCEL_FLAG" -eq 1 ]; then continue; fi
+
+                        echo "$LNX_PASS" > "$CRED_FILE"
+                        chmod 600 "$CRED_FILE"
+
+                        ORIGEN_DESC="Linux: $LNX_USER@$LNX_IP:$LNX_PATH"
+                        ORIGEN_PATH="$LNX_USER@$LNX_IP:$LNX_PATH"
+                        PRE_CMD=""
+                        POST_CMD=""
+                        ;;
+
+                    3)
+                        # Local
+                        LOC_PATH=$(whiptail --title "Carpeta Local" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                            --inputbox "Ingresa la ruta local de la carpeta a respaldar:" 10 65 "/srv/nas/SISTEMAS" 3>&1 1>&2 2>&3)
+                        if [ -z "$LOC_PATH" ]; then continue; fi
+
+                        if [ ! -d "$LOC_PATH" ]; then
+                            whiptail --title "Aviso" --ok-button "< Aceptar >" --msgbox "La carpeta $LOC_PATH no existe actualmente. Se creará al respaldar." 8 55
+                        fi
+
+                        ORIGEN_DESC="Local: $LOC_PATH"
+                        ORIGEN_PATH="$LOC_PATH"
+                        PRE_CMD=""
+                        POST_CMD=""
+                        ;;
+                esac
+
+                # Paso 3: Directorio Destino
+                DESTINO_BKP=$(whiptail --title "Directorio Destino en el Servidor" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Carpeta donde se almacenarán los respaldos:" 10 65 "/srv/nas/BACKUPS_HISTORICOS/$NAME_BKP" 3>&1 1>&2 2>&3)
+                if [ -z "$DESTINO_BKP" ]; then continue; fi
+
+                # Paso 4: Tipo de Respaldo
+                TIPO_BKP=$(whiptail --title "Método de Copia de Seguridad" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el método de respaldo:" 15 72 2 \
+                    "1" "Incremental con Snapshots y Hardlinks (Recomendado - 85% Ahorro de Espacio)" \
+                    "2" "Sincronización Espejo (Clon idéntico del Origen)" 3>&1 1>&2 2>&3)
+                if [ -z "$TIPO_BKP" ]; then continue; fi
+
+                TIPO_STR="Incremental_Snapshots"
+                [ "$TIPO_BKP" == "2" ] && TIPO_STR="Espejo_Mirror"
+
+                # Paso 5: Frecuencia de Ejecución
+                FRECUENCIA=$(whiptail --title "Frecuencia de Ejecución Automática" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el horario programado para ejecutar el backup:" 16 68 4 \
+                    "1" "Diario a las 23:00 hrs (Noches)" \
+                    "2" "Semanal (Domingos a las 02:00 hrs)" \
+                    "3" "Cada 6 Horas" \
+                    "4" "Solo Manual (Sin programación cron)" 3>&1 1>&2 2>&3)
+                if [ -z "$FRECUENCIA" ]; then continue; fi
+
+                CRON_SCHED=""
+                FREQ_TXT="Manual"
+                case "$FRECUENCIA" in
+                    1) CRON_SCHED="0 23 * * *"; FREQ_TXT="Diario a las 23:00";;
+                    2) CRON_SCHED="0 2 * * 0"; FREQ_TXT="Semanal (Domingos 02:00)";;
+                    3) CRON_SCHED="0 */6 * * *"; FREQ_TXT="Cada 6 horas";;
+                    4) CRON_SCHED=""; FREQ_TXT="Solo Manual";;
+                esac
+
+                # Paso 6: Política de Retención
+                RETENCION="7"
+                if [ "$TIPO_BKP" == "1" ]; then
+                    RETENCION=$(whiptail --title "Política de Retención Histórica" \
+                        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                        --inputbox "¿Cuántos snapshots históricos diarios deseas conservar?" 10 65 "7" 3>&1 1>&2 2>&3)
+                    [ -z "$RETENCION" ] && RETENCION="7"
+                fi
+
+                # Paso 7: Confirmación
+                RESUMEN_BKP="CONFIGURACION DE LA TAREA:
+* Tarea        : $NAME_BKP
+* Tipo         : $TIPO_STR
+* Origen       : $ORIGEN_DESC
+* Destino      : $DESTINO_BKP
+* Horario      : $FREQ_TXT"
+                [ "$TIPO_BKP" == "1" ] && RESUMEN_BKP="$RESUMEN_BKP
+* Retencion    : Conservar ultimas $RETENCION copias (Hardlinks)"
+
+                if (whiptail --title "Confirmar Tarea de Backup" \
+                    --yes-button "< Sí, Guardar y Activar >" --no-button "< Cancelar >" \
+                    --yesno "$RESUMEN_BKP\n\n¿Confirmas la creación de esta tarea automatizada?" 18 72); then
+                    
+                    mkdir -p "$DESTINO_BKP" /srv/nas/LOGS_BACKUP
+
+                    SCRIPT_FILE="/usr/local/bin/backup_${NAME_BKP}.sh"
+                    cat << BKPEXEC > "$SCRIPT_FILE"
+#!/bin/bash
+# Script de Respaldo Automatizado: $NAME_BKP
+# ORIGEN_DESC=$ORIGEN_DESC
+# TIPO_DESC=$TIPO_STR
+set -e
+
+DESTINO="$DESTINO_BKP"
+RETENCION=$RETENCION
+FECHA=\$(date +%Y-%m-%d_%H%M%S)
+LOG_FILE="/srv/nas/LOGS_BACKUP/backup_${NAME_BKP}.log"
+
+mkdir -p "\$DESTINO" /srv/nas/LOGS_BACKUP
+
+echo "==============================================================================" >> "\$LOG_FILE"
+echo "[\$FECHA] INICIANDO BACKUP: $NAME_BKP ($TIPO_STR)" >> "\$LOG_FILE"
+echo "Origen: $ORIGEN_DESC -> Destino: \$DESTINO" >> "\$LOG_FILE"
+
+# 1. Preparar origen (Montaje CIFS si aplica)
+$PRE_CMD
+
+cleanup() {
+    $POST_CMD
+}
+trap cleanup EXIT
+
+# 2. Ejecutar Respaldo
+if [ "$PLAT_ORIGEN" == "2" ]; then
+    # SSH Remoto Linux
+    SSH_PASS_OPT="sshpass -f $CRED_FILE ssh -o StrictHostKeyChecking=no"
+    if [ "$TIPO_BKP" == "1" ]; then
+        ULTIMO_SNAPSHOT=\$(ls -td "\$DESTINO"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+        NUEVO_SNAPSHOT="\$DESTINO/snapshot_\$FECHA"
+        LINK_DEST_OPT=""
+        [ -n "\$ULTIMO_SNAPSHOT" ] && LINK_DEST_OPT="--link-dest=\$ULTIMO_SNAPSHOT"
+
+        rsync -avz --delete \$LINK_DEST_OPT -e "\$SSH_PASS_OPT" "$ORIGEN_PATH/" "\$NUEVO_SNAPSHOT/" >> "\$LOG_FILE" 2>&1
+    else
+        rsync -avz --delete -e "\$SSH_PASS_OPT" "$ORIGEN_PATH/" "\$DESTINO/" >> "\$LOG_FILE" 2>&1
+    fi
+else
+    # Local o Windows CIFS montado
+    if [ "$TIPO_BKP" == "1" ]; then
+        ULTIMO_SNAPSHOT=\$(ls -td "\$DESTINO"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+        NUEVO_SNAPSHOT="\$DESTINO/snapshot_\$FECHA"
+        LINK_DEST_OPT=""
+        [ -n "\$ULTIMO_SNAPSHOT" ] && LINK_DEST_OPT="--link-dest=\$ULTIMO_SNAPSHOT"
+
+        rsync -a --delete \$LINK_DEST_OPT "$ORIGEN_PATH/" "\$NUEVO_SNAPSHOT/" >> "\$LOG_FILE" 2>&1
+    else
+        rsync -av --delete "$ORIGEN_PATH/" "\$DESTINO/" >> "\$LOG_FILE" 2>&1
+    fi
+fi
+
+# 3. Política de Retención Histórica
+if [ "$TIPO_BKP" == "1" ]; then
+    cd "\$DESTINO"
+    TOTAL_SNAPSHOTS=\$(ls -td snapshot_* 2>/dev/null | wc -l)
+    if [ "\$TOTAL_SNAPSHOTS" -gt "\$RETENCION" ]; then
+        ls -td snapshot_* | tail -n +"\$((RETENCION + 1))" | while read -r old; do
+            echo "Eliminando snapshot caducado: \$old" >> "\$LOG_FILE"
+            rm -rf "\$old"
+        done
+    fi
+fi
+
+echo "[\$(date +%Y-%m-%d_%H%M%S)] BACKUP FINALIZADO EXITOSAMENTE." >> "\$LOG_FILE"
+echo "==============================================================================" >> "\$LOG_FILE"
+BKPEXEC
+                    chmod 755 "$SCRIPT_FILE"
+
+                    if [ -n "$CRON_SCHED" ]; then
+                        echo "$CRON_SCHED root $SCRIPT_FILE >/dev/null 2>&1" > "/etc/cron.d/backup_${NAME_BKP}"
+                        chmod 644 "/etc/cron.d/backup_${NAME_BKP}"
+                    else
+                        rm -f "/etc/cron.d/backup_${NAME_BKP}"
+                    fi
+
+                    whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                        --msgbox "✔ ¡Tarea de Backup [$NAME_BKP] creada con éxito!\n\n• Plataforma: $ORIGEN_DESC\n• Horario:    $FREQ_TXT\n• Script:     $SCRIPT_FILE\n• Registro:   /srv/nas/LOGS_BACKUP/backup_${NAME_BKP}.log" 13 72
+                fi
+                ;;
+
+            3)
+                # Ejecutar ahora
+                TAREAS_RUN=$(ls -1 /usr/local/bin/backup_*.sh 2>/dev/null | sed "s|/usr/local/bin/backup_||; s|\.sh||" || echo "")
+                if [ -z "$TAREAS_RUN" ]; then
+                    whiptail --ok-button "< Aceptar >" --msgbox "No hay tareas de backup creadas actualmente." 8 48
+                    continue
+                fi
+
+                MENU_RUN=""
+                for t in $TAREAS_RUN; do
+                    MENU_RUN="$MENU_RUN $t Ejecutar_Respaldo"
+                done
+
+                TASK_SELECTED=$(whiptail --title "Ejecutar Backup Manual" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona la tarea que deseas ejecutar ahora mismo:" 16 68 6 \
+                    $MENU_RUN 3>&1 1>&2 2>&3)
+
+                if [ $? -eq 0 ] && [ -n "$TASK_SELECTED" ]; then
+                    clear
+                    echo -e "${C_CYAN}==============================================================================${C_RESET}"
+                    echo -e "${C_BOLD}EJECUTANDO TAREA DE RESPALDO: [${TASK_SELECTED}]${C_RESET}"
+                    echo -e "${C_CYAN}==============================================================================${C_RESET}\n"
+                    
+                    bash "/usr/local/bin/backup_${TASK_SELECTED}.sh"
+                    
+                    echo -e "\n${C_GREEN}✔ ¡Respaldo completado exitosamente!${C_RESET}"
+                    echo -e "${C_GRAY}Últimas líneas del registro (/srv/nas/LOGS_BACKUP/backup_${TASK_SELECTED}.log):${C_RESET}"
+                    tail -n 8 "/srv/nas/LOGS_BACKUP/backup_${TASK_SELECTED}.log" 2>/dev/null || true
+                    echo ""
+                    read -n 1 -s -r -p "Presiona cualquier tecla para continuar..."
+                fi
+                ;;
+
+            4)
+                # Eliminar tarea
+                TAREAS_DEL=$(ls -1 /usr/local/bin/backup_*.sh 2>/dev/null | sed "s|/usr/local/bin/backup_||; s|\.sh||" || echo "")
+                if [ -z "$TAREAS_DEL" ]; then
+                    whiptail --ok-button "< Aceptar >" --msgbox "No hay tareas para eliminar." 8 45
+                    continue
+                fi
+
+                MENU_DEL=""
+                for t in $TAREAS_DEL; do
+                    MENU_DEL="$MENU_DEL $t Tarea_Programada"
+                done
+
+                TASK_DEL_SEL=$(whiptail --title "Eliminar Tarea de Backup" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona la tarea que deseas eliminar:" 16 68 6 \
+                    $MENU_DEL 3>&1 1>&2 2>&3)
+
+                if [ $? -eq 0 ] && [ -n "$TASK_DEL_SEL" ]; then
+                    if (whiptail --title "Confirmar Eliminación de Tarea" \
+                        --yes-button "< Sí, Eliminar Tarea >" --no-button "< Cancelar >" \
+                        --yesno "¿Estás seguro de que deseas eliminar la tarea [$TASK_DEL_SEL] y sus credenciales?\n\n(Los respaldos históricos en disco no se borrarán)." 12 70); then
+                        
+                        rm -f "/usr/local/bin/backup_${TASK_DEL_SEL}.sh" "/etc/cron.d/backup_${TASK_DEL_SEL}" "/etc/backup-credentials/${TASK_DEL_SEL}.cred" "/mnt/backup_sources/${TASK_DEL_SEL}" 2>/dev/null || true
+                        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                            --msgbox "✔ Tarea [$TASK_DEL_SEL] eliminada exitosamente." 8 50
+                    fi
+                fi
+                ;;
+        esac
+    done
+}
+
+# ==============================================================================
+# 5. FUNCIÓN: GESTOR DE EMPLEADOS Y USUARIOS
+# ==============================================================================
+crear_usuario_guiado() {
+    USER_NAME=$(whiptail --title "$APP_TITLE" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --inputbox "Ingresa el nombre de usuario para el empleado (ej. carlos_mendoza):" 10 65 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$USER_NAME" ]; then return; fi
+
+    if ! [[ "$USER_NAME" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        whiptail --title "Error de Formato" --ok-button "< Aceptar >" \
+            --msgbox "El nombre de usuario solo puede contener letras minúsculas, números y guión bajo." 10 60
+        return
+    fi
+
+    ROL=$(whiptail --title "Perfil Jerárquico" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --menu "Selecciona el perfil de acceso del empleado:" 16 68 5 \
+        "SISTEMAS" "Acceso Total a todo el NAS y Backups (TI)" \
+        "ADMINISTRATIVO" "Gestión y Supervisión de Campaña" \
+        "ANALISTA" "Acceso a Admin y Analistas (Bloqueado de Asesores)" \
+        "ASESOR" "Acceso exclusivo a Asesores" \
+        "BACKUP" "Usuario exclusivo de almacenamiento de Backups" 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$ROL" ]; then return; fi
+
+    CAMPANA=""
+    if [ "$ROL" != "SISTEMAS" ] && [ "$ROL" != "BACKUP" ]; then
+        CAMPANA=$(whiptail --title "Asignación de Campaña" \
+            --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+            --menu "Selecciona la campaña del empleado:" 12 60 2 \
+            "C1" "CAMPAÑA UNO" \
+            "C2" "CAMPAÑA DOS" 3>&1 1>&2 2>&3)
+        if [ $? -ne 0 ] || [ -z "$CAMPANA" ]; then return; fi
+    fi
+
+    USER_PW=$(whiptail --title "$APP_TITLE" \
+        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+        --passwordbox "Ingresa la contraseña de red Samba para $USER_NAME:" 10 60 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$USER_PW" ]; then
+        whiptail --title "Error" --ok-button "< Aceptar >" --msgbox "La contraseña no puede estar vacía." 8 45
+        return
+    fi
+
+    GRUPO_FINAL="grp_empleados_ead"
+    if [ "$ROL" == "SISTEMAS" ]; then
+        GRUPO_FINAL="grp_empleados_ead,grp_sistemas,grp_backups"
+    elif [ "$ROL" == "BACKUP" ]; then
+        GRUPO_FINAL="grp_backups"
+    elif [ "$CAMPANA" == "C1" ]; then
+        if [ "$ROL" == "ADMINISTRATIVO" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c1_admin"; fi
+        if [ "$ROL" == "ANALISTA" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c1_analista"; fi
+        if [ "$ROL" == "ASESOR" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c1_asesor"; fi
+    elif [ "$CAMPANA" == "C2" ]; then
+        if [ "$ROL" == "ADMINISTRATIVO" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c2_admin"; fi
+        if [ "$ROL" == "ANALISTA" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c2_analista"; fi
+        if [ "$ROL" == "ASESOR" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c2_asesor"; fi
+    fi
+
+    if (whiptail --title "Confirmar Registro de Usuario" \
+        --yes-button "< Sí, Registrar Usuario >" --no-button "< Cancelar >" \
+        --yesno "¿Confirmas el registro con los siguientes datos?\n\n• Usuario:  $USER_NAME\n• Perfil:   $ROL\n• Campaña:  ${CAMPANA:-Global}\n• Grupos:   $GRUPO_FINAL" 13 65); then
+        
+        if ! id "$USER_NAME" &>/dev/null; then
+            adduser --disabled-password --gecos "" --no-create-home --shell /usr/sbin/nologin "$USER_NAME"
+        fi
+
+        usermod -aG "$GRUPO_FINAL" "$USER_NAME"
+        echo -e "${USER_PW}\n${USER_PW}" | smbpasswd -a -s "$USER_NAME"
+
+        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+            --msgbox "✔ ¡Usuario Registrado con Éxito!\n\n• Usuario:  $USER_NAME\n• Perfil:   $ROL\n• Campaña:  ${CAMPANA:-Global}\n• Grupos:   $GRUPO_FINAL\n\nYa puede acceder desde la red a: \\\\10.10.1.2" 14 65
+    fi
+}
+
+# ==============================================================================
+# 6. FUNCIÓN: DIAGNÓSTICO Y ESTADO
+# ==============================================================================
+diagnostico_nas() {
+    clear
+    echo -e "${C_CYAN}"
+    echo "  ╭──────────────────────────────────────────────────────────────────────────╮"
+    echo "  │               DIAGNÓSTICO EN VIVO • SERVIDOR EAD-COL                     │"
+    echo "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+
+    echo -e "  ${C_BOLD}${C_WHITE}1. ESTADO DE SERVICIOS EN TIEMPO REAL:${C_RESET}"
+    for s in smbd nmbd wsdd2 cockpit.socket cron; do
+        if systemctl is-active "$s" &>/dev/null; then
+            echo -e "     [${C_GREEN}● ACTIVO${C_RESET}] $s"
+        else
+            echo -e "     [${C_RED}● INACTIVO${C_RESET}] $s"
+        fi
+    done
+
+    echo -e "\n  ${C_BOLD}${C_WHITE}2. ALMACENAMIENTO DEL SERVIDOR (/srv/nas):${C_RESET}"
+    df -h /srv/nas 2>/dev/null | awk 'NR==2 {printf "     Capacidad Total: %s | Utilizado: %s (%s) | Libre: %s\n", $2, $3, $5, $4}'
+
+    echo -e "\n  ${C_BOLD}${C_WHITE}3. RECURSOS COMPARTIDOS EN SAMBA:${C_RESET}"
+    grep -E "^\[" /etc/samba/smb.conf | grep -v "global" | tr -d "[]" | while read -r r; do
+        echo -e "     [•] ${C_YELLOW}$r${C_RESET}"
+    done
+
+    echo -e "\n  ${C_BOLD}${C_WHITE}4. TAREAS DE BACKUP PROGRAMADAS:${C_RESET}"
+    for b in /etc/cron.d/backup_*; do
+        if [ -f "$b" ]; then
+            echo -e "     [⏱] ${C_CYAN}$(basename "$b" | sed "s/backup_//"):${C_RESET} ${C_WHITE}$(cat "$b")${C_RESET}"
+        fi
+    done
+
+    echo -e "\n  ${C_GRAY}──────────────────────────────────────────────────────────────────────────${C_RESET}"
+    read -n 1 -s -r -p "  Presiona cualquier tecla para regresar al menú principal..."
+}
+
+# ==============================================================================
+# 7. FUNCIÓN: DESINSTALACIÓN
+# ==============================================================================
+desinstalar_guiado() {
+    if (whiptail --title "ALERTA DE DESINSTALACIÓN CRÍTICA" \
+        --yes-button "< Sí, Desinstalar Todo >" --no-button "< Cancelar >" \
+        --yesno "¡CUIDADO! Esta acción desinstalará todos los paquetes de Samba, Cockpit, desmontará el disco y limpiará las configuraciones.\n\n¿Confirmas que deseas restablecer el servidor a su estado base limpio?" 12 72); then
+        clear
+        bash /home/nas/desinstalar_nas_ead.sh
+        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+            --msgbox "✔ El servidor ha sido desinstalado y el sistema quedó completamente limpio." 8 65
+    fi
+}
+
+# ==============================================================================
+# MENÚ PRINCIPAL INTERACTIVO
+# ==============================================================================
+while true; do
+    OPCION=$(whiptail --title "$APP_TITLE" \
+        --ok-button "< Seleccionar >" --cancel-button "< Salir >" \
+        --menu "Selecciona una opción usando las flechas y presiona Enter:" 20 74 8 \
+        "1" "[1]  Desplegar Servidor (NAS de Archivos o Central de Backup)" \
+        "2" "[2]  Gestión de Grupos de Seguridad (Crear / Listar / Eliminar)" \
+        "3" "[3]  Gestión de Recursos Compartidos (Ver / Crear / Deshabilitar / Borrar)" \
+        "4" "[4]  Gestión de Tareas de Backup (Windows / Linux / Local)" \
+        "5" "[5]  Gestión de Usuarios / Empleados (Crear Rol, Campaña y Clave)" \
+        "6" "[6]  Ver Diagnóstico, Discos y Recursos Compartidos" \
+        "7" "[7]  Reiniciar Servicios de Red (Samba / Cockpit)" \
+        "8" "[8]  Desinstalar y Limpiar Servidor" 3>&1 1>&2 2>&3)
+
+    if [ $? -ne 0 ]; then
+        clear
+        break
+    fi
+
+    case "$OPCION" in
+        1) instalar_nas ;;
+        2) gestionar_grupos ;;
+        3) gestionar_recursos_compartidos ;;
+        4) gestionar_backups ;;
+        5) crear_usuario_guiado ;;
+        6) diagnostico_nas ;;
+        7) 
+            if (whiptail --title "Confirmar Reinicio" \
+                --yes-button "< Sí, Reiniciar >" --no-button "< Cancelar >" \
+                --yesno "¿Deseas reiniciar los servicios de red de Samba, WSDD2 y Cockpit ahora?" 9 65); then
+                systemctl restart smbd nmbd wsdd2 cockpit.socket cockpit.service
+                whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                    --msgbox "✔ Servicios de Samba, WSDD2 y Cockpit reiniciados correctamente." 8 60
+            fi
+            ;;
+        8) desinstalar_guiado ;;
+    esac
+done
