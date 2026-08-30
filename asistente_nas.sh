@@ -283,13 +283,8 @@ INCLUYE PARCHES AUTOMATICOS:
         local ret_exec=$?
         
         if [ $ret_exec -eq 0 ]; then
-            if [ "$ROL_SERVER" == "BACKUP" ]; then
-                whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
-                    --msgbox "✔ ¡Central de Respaldos Desplegada con Éxito!\n\n• Panel Web Cockpit: https://${SERVER_IP}:9090\n• Usuario Admin:     $ADMIN_USER\n• Repositorio CIFS:  \\\\${SERVER_IP}\\BACKUPS_WINDOWS$\n\n🔒 SEGURIDAD CONTRA RANSOMWARE:\nLas carpetas de backup están OCULTAS (con sufijo $). Windows no las mostrará en la lista de red para protegerlas de ataques.\n\nPara conectar desde Windows, escribe en el Explorador de Archivos la ruta completa:\n\\\\${SERVER_IP}\\BACKUPS_WINDOWS$" 18 74
-            else
-                whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
-                    --msgbox "✔ ¡Servidor NAS Desplegado con Éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://${SERVER_IP}:9090\n• Usuario Admin:   $ADMIN_USER\n• Red Windows:     \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)\n\n💡 SIGUIENTE PASO:\nUtiliza las opciones [2] y [3] del menú para crear tus grupos y carpetas compartidas a medida." 16 72
-            fi
+            whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
+                --msgbox "✔ ¡Despliegue del Servidor ($ROL_SERVER) Completado con Éxito!\n\n• Panel Web Cockpit: https://${SERVER_IP}:9090\n• Administrador:     $ADMIN_USER (con permisos sudo y Samba)\n• Grupo Maestro:     grp_sistemas (Permisos totales sobre /srv/nas)\n• Redes Compartidas: 0 (Servidor base 100% limpio)\n\n💡 SIGUIENTE PASO:\nUtiliza las opciones [2] y [3] del menú para crear tus grupos y definir tus carpetas compartidas (visibles u ocultas $) a medida." 17 74
         else
             whiptail --title "Error en el Despliegue" --ok-button "< Aceptar >" \
                 --msgbox "✖ Ocurrió un error durante la ejecución del script de despliegue (Código de salida: $ret_exec).\n\nRevisa los mensajes anteriores en la consola." 12 70

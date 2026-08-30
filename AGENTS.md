@@ -57,22 +57,16 @@ Carpetas Visibles:            Grupos:         Carpetas Ocultas ($):         Grup
 [CAMPANA_DOS_*]               grp_c1_*, c2_*  [BACKUPS_SERVIDORES$]         (Cero empleados)
 ```
 
-### A. Rol `ARCHIVOS` (Servidor NAS Modular y Limpio):
-* **Despliegue Base Limpio:** Despliega la infraestructura base (Discos, Samba, WSDD2, Cockpit, UFW) con grupos base de administración (`grp_sistemas`, `grp_backups`) y deja el archivo `smb.conf` preparado para crear recursos personalizados sin residuos.
-* **Gestión Dinámica de Grupos y Recursos desde el Asistente:**
-  * **Grupos Libres:** Creación de cualquier grupo (`grp_ventas`, `grp_contabilidad`, etc.).
-  * **4 Esquemas de Permisos Granulares:**
+### A. Despliegue Base Limpio (Servidor NAS o Central de Backup):
+* **0 Redes Compartidas Automáticas:** El archivo `smb.conf` se inicializa únicamente con la sección `[global]` optimizada, sin recursos de prueba ni carpetas innecesarias.
+* **Grupo Maestro:** Únicamente se crea `grp_sistemas` (con permisos totales `2775` sobre `/srv/nas`). El administrador del servidor queda asignado a `sudo,adm,grp_sistemas`.
+* **Gestión 100% Modular desde el Asistente:**
+  * **Creación de Grupos (Menú [2]):** Grupos departamentales o técnicos según las necesidades del entorno.
+  * **Creación de Recursos (Menú [3]):** Configuración guiada con elección de visibilidad (Oculto `$` por defecto o Visible) y 4 esquemas de permisos granulares:
     1. *Lectura y Escritura por Grupo:* Todos los grupos autorizados (`read only = no`, `mask 0770`).
-    2. *Solo Lectura General + Escritura Exclusiva:* Acceso general de lectura con permiso de escritura reservado a un grupo específico (`read only = yes`, `write list = @grupo_escritura`, `mask 0775`).
+    2. *Solo Lectura General + Escritura Exclusiva:* Acceso general de lectura con escritura restringida (`read only = yes`, `write list = @grupo_escritura`, `mask 0775`).
     3. *Solo Lectura Estricta:* Consulta histórica sin modificación (`read only = yes`, `mask 0755`).
-    4. *Acceso Público / Invitados:* Libre acceso con o sin contraseña (`guest ok = yes`).
-
-### B. Rol `BACKUP` (Central de Respaldos 100% Oculto e Inmune a Ransomware):
-* **Grupos Creados:** Únicamente `grp_sistemas` y `grp_backups`.
-* **Recursos Samba:** Ocultos con sufijo `$` y `browseable = no`. Invisibles en la red de Windows:
-  * `[BACKUPS_WINDOWS$]` ➜ `/srv/nas/BACKUPS_WINDOWS`
-  * `[BACKUPS_LINUX$]` ➜ `/srv/nas/BACKUPS_LINUX`
-  * `[BACKUPS_SERVIDORES$]` ➜ `/srv/nas/BACKUPS_SERVIDORES`
+    4. *Acceso Público / Invitados:* Libre acceso con o sin clave (`guest ok = yes`).
 
 ---
 

@@ -150,16 +150,15 @@ ExecStart=
 ExecStart=/usr/sbin/wsdd2 \$WSDD2_OPTS
 WSDDOVERRIDE
 
-echo " [4/9] Creando grupos y configurando Administrador ($ADMIN_USER)..."
-# Grupos base de administración del sistema
+echo " [4/9] Creando grupo Sistemas y configurando Administrador ($ADMIN_USER)..."
+# Grupo principal de administración con permisos totales
 groupadd -f grp_sistemas
-groupadd -f grp_backups
 
 if ! id "$ADMIN_USER" &>/dev/null; then
     adduser --disabled-password --gecos "" "$ADMIN_USER"
 fi
 
-usermod -aG sudo,adm,grp_sistemas,grp_backups "$ADMIN_USER"
+usermod -aG sudo,adm,grp_sistemas "$ADMIN_USER"
 echo "$ADMIN_USER ALL=(ALL:ALL) ALL" > "/etc/sudoers.d/$ADMIN_USER"
 chmod 0440 "/etc/sudoers.d/$ADMIN_USER"
 
@@ -168,84 +167,16 @@ if [ -n "$ADMIN_PASS" ]; then
     echo -e "${ADMIN_PASS}\n${ADMIN_PASS}" | smbpasswd -a -s "$ADMIN_USER" 2>/dev/null || true
 fi
 
-echo " [5/9] Creando estructura de directorios y permisos según el rol ($SERVER_ROLE)..."
-if [ "$SERVER_ROLE" == "BACKUP" ]; then
-    mkdir -p /srv/nas/BACKUPS_WINDOWS
-    mkdir -p /srv/nas/BACKUPS_LINUX
-    mkdir -p /srv/nas/BACKUPS_SERVIDORES
-    mkdir -p /srv/nas/SNAPSHOTS_NAS
-    mkdir -p /srv/nas/LOGS_BACKUP
+echo " [5/9] Preparando almacenamiento base en /srv/nas con permisos para Sistemas..."
+mkdir -p /srv/nas /srv/nas/BACKUPS_HISTORICOS /srv/nas/LOGS_BACKUP
+chown -R root:grp_sistemas /srv/nas
+chmod -R 2775 /srv/nas
 
-    chown -R root:grp_backups /srv/nas/BACKUPS_WINDOWS && chmod -R 2770 /srv/nas/BACKUPS_WINDOWS
-    chown -R root:grp_backups /srv/nas/BACKUPS_LINUX && chmod -R 2770 /srv/nas/BACKUPS_LINUX
-    chown -R root:grp_backups /srv/nas/BACKUPS_SERVIDORES && chmod -R 2770 /srv/nas/BACKUPS_SERVIDORES
-    chown -R root:grp_sistemas /srv/nas/SNAPSHOTS_NAS && chmod -R 2770 /srv/nas/SNAPSHOTS_NAS
-    chown -R root:grp_sistemas /srv/nas/LOGS_BACKUP && chmod -R 2775 /srv/nas/LOGS_BACKUP
-else
-    # Servidor NAS: Directorio raíz base limpio preparado para recursos personalizados
-    mkdir -p /srv/nas
-    chown root:grp_sistemas /srv/nas
-    chmod 2775 /srv/nas
-fi
-
-echo " [6/9] Configurando /etc/samba/smb.conf para rol $SERVER_ROLE..."
-if [ "$SERVER_ROLE" == "BACKUP" ]; then
+echo " [6/9] Configurando /etc/samba/smb.conf (Infraestructura Limpia)..."
 cat << SMBCONF > /etc/samba/smb.conf
 [global]
    workgroup = $SMB_WORKGROUP
-   server string = Servidor Central de Respaldos (Backup) $SMB_WORKGROUP
-   server role = standalone server
-   netbios name = $SMB_NETBIOS
-   security = user
-   map to guest = Never
-   server min protocol = SMB2_02
-   server smb encrypt = desired
-   dns proxy = no
-   include = registry
-
-   log file = /var/log/samba/log.%m
-   max log size = 1000
-   logging = file
-
-# Recursos de Backup Ocultos (Invisible para la red publica)
-[BACKUPS_WINDOWS$]
-   comment = Repositorio Oculto de Backups para Windows
-   path = /srv/nas/BACKUPS_WINDOWS
-   browseable = no
-   read only = no
-   valid users = @grp_sistemas, @grp_backups
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-
-[BACKUPS_LINUX$]
-   comment = Repositorio Oculto de Backups para Linux
-   path = /srv/nas/BACKUPS_LINUX
-   browseable = no
-   read only = no
-   valid users = @grp_sistemas, @grp_backups
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-
-[BACKUPS_SERVIDORES$]
-   comment = Repositorio Oculto de Imagenes y Servidores
-   path = /srv/nas/BACKUPS_SERVIDORES
-   browseable = no
-   read only = no
-   valid users = @grp_sistemas, @grp_backups
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-SMBCONF
-else
-cat << SMBCONF > /etc/samba/smb.conf
-[global]
-   workgroup = $SMB_WORKGROUP
-   server string = Servidor NAS $SMB_WORKGROUP
+   server string = Servidor $SERVER_ROLE $SMB_WORKGROUP
    server role = standalone server
    netbios name = $SMB_NETBIOS
    security = user
@@ -259,7 +190,6 @@ cat << SMBCONF > /etc/samba/smb.conf
    max log size = 1000
    logging = file
 SMBCONF
-fi
 
 echo " [7/9] Aplicando correcciones y compatibilidad total para Cockpit..."
 mkdir -p /root/.ssh "/home/$ADMIN_USER/.ssh" /etc/skel/.ssh /nonexistent/.ssh
