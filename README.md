@@ -97,22 +97,24 @@ ping -c 4 google.com
    grep -E '/bin/bash|/bin/sh' /etc/passwd
    ```
 
-2. **Instalar `sudo` y agregar al usuario estándar:**
+2. **Instalar `sudo` y conceder permisos directos e inmediatos:**
    ```bash
    apt install -y sudo
    usermod -aG sudo <nombre_usuario>
+   echo "<nombre_usuario> ALL=(ALL:ALL) ALL" > /etc/sudoers.d/<nombre_usuario>
+   chmod 0440 /etc/sudoers.d/<nombre_usuario>
    ```
    *Ejemplo para el usuario `jose`:*
    ```bash
    usermod -aG sudo jose
+   echo "jose ALL=(ALL:ALL) ALL" > /etc/sudoers.d/jose
+   chmod 0440 /etc/sudoers.d/jose
    ```
-   *(Si el sistema no encuentra la orden `usermod`, ejecuta `/usr/sbin/usermod -aG sudo jose`).*
+   > **Nota:** La creación del archivo en `/etc/sudoers.d/` garantiza que los permisos de `sudo` surtan efecto **inmediatamente** en todas las terminales activas sin necesidad de cerrar sesión o reiniciar.
 
-3. **Aplicar los permisos en la terminal activa:**
-   Sal del usuario root y recarga la pertenencia a los grupos en tu usuario estándar:
+3. **Salir de root:**
    ```bash
    exit
-   newgrp sudo
    ```
 
 ---
