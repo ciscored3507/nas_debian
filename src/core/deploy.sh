@@ -90,6 +90,22 @@ install_deb_pkg "https://github.com/45Drives/cockpit-navigator/releases/download
 cd /
 rm -rf "$TMP_DIR"
 
+# Parche Cockpit Identities (Filtrar exclusivamente grupos grp_* y ocultar cuentas del sistema)
+python3 -c '
+import glob, os
+
+for js in glob.glob("/usr/share/cockpit/identities/assets/*.js"):
+    try:
+        with open(js, "r", encoding="utf-8") as f:
+            c = f.read()
+        c = c.replace("l.value=f.split(`\\n`).filter(w=>!/^\\s*$/.test(w))", "l.value=f.split(`\\n`).filter(w=>w.startsWith(\"grp_\"))")
+        c = c.replace("if(u<1e3&&u!==0)return null;", "if(u<1e3)return null;")
+        with open(js, "w", encoding="utf-8") as f:
+            f.write(c)
+    except:
+        pass
+' 2>/dev/null || true
+
 # Parche WSDD2
 echo "WSDD2_OPTS=\"-N $SMB_NETBIOS -G $SMB_WORKGROUP -H $SMB_NETBIOS\"" > /etc/default/wsdd2
 mkdir -p /etc/systemd/system/wsdd2.service.d
