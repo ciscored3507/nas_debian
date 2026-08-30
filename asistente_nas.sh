@@ -431,16 +431,35 @@ for name, d in shares.items():
                     --inputbox "Ingresa el nombre del recurso para Windows (ej. VENTAS o BACKUPS):" 10 65 3>&1 1>&2 2>&3)
                 if [ $? -ne 0 ] || [ -z "$NOMBRE_SHARE" ]; then continue; fi
 
-                NOMBRE_SHARE=$(echo "$NOMBRE_SHARE" | tr " " "_" | tr -cd "A-Za-z0-9_-")
+                NOMBRE_SHARE=$(echo "$NOMBRE_SHARE" | tr " " "_" | tr -cd "A-Za-z0-9_$-")
+
+                OPC_VIS=$(whiptail --title "Visibilidad en Red (Samba / Windows)" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona la visibilidad del recurso en el entorno de red de Windows:" 15 72 2 \
+                    "1" "Recurso OCULTO ($) - No visible en explorador (Recomendado)" \
+                    "2" "Recurso VISIBLE - Visible en explorador de red para todos" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$OPC_VIS" ]; then continue; fi
+
+                if [ "$OPC_VIS" == "1" ]; then
+                    [[ "$NOMBRE_SHARE" != *\$ ]] && NOMBRE_SHARE="${NOMBRE_SHARE}\$"
+                    BROWSEABLE="no"
+                    VIS_TXT="Oculto ($) [Invisible en explorador de red]"
+                else
+                    NOMBRE_SHARE="${NOMBRE_SHARE%\$}"
+                    BROWSEABLE="yes"
+                    VIS_TXT="Visible en red"
+                fi
+
+                NOMBRE_DIR="${NOMBRE_SHARE%\$}"
                 RUTA_SHARE=$(whiptail --title "$APP_TITLE" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-                    --inputbox "Ruta física en el disco del servidor:" 10 65 "/srv/nas/$NOMBRE_SHARE" 3>&1 1>&2 2>&3)
+                    --inputbox "Ruta física en el disco del servidor:" 10 65 "/srv/nas/$NOMBRE_DIR" 3>&1 1>&2 2>&3)
                 if [ $? -ne 0 ] || [ -z "$RUTA_SHARE" ]; then continue; fi
 
                 COMENTARIO=$(whiptail --title "$APP_TITLE" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-                    --inputbox "Descripción o comentario del recurso:" 10 65 "Carpeta compartida $NOMBRE_SHARE" 3>&1 1>&2 2>&3)
-                [ -z "$COMENTARIO" ] && COMENTARIO="Carpeta compartida $NOMBRE_SHARE"
+                    --inputbox "Descripción o comentario del recurso:" 10 65 "Carpeta compartida $NOMBRE_DIR" 3>&1 1>&2 2>&3)
+                [ -z "$COMENTARIO" ] && COMENTARIO="Carpeta compartida $NOMBRE_DIR"
 
                 TIPO_PERM=$(whiptail --title "Esquema de Seguridad y Permisos" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
@@ -612,7 +631,7 @@ for name, d in shares.items():
 
                 if (whiptail --title "Confirmar Creación de Recurso" \
                     --yes-button "< Sí, Crear Recurso >" --no-button "< Cancelar >" \
-                    --yesno "¿Confirmas la creación del recurso con los siguientes parámetros?\n\n• Nombre:   [$NOMBRE_SHARE]\n• Ruta:     $RUTA_SHARE\n• Tipo:     $TIPO_TXT\n• Acceso:   ${VALID_USERS:-Invitados (Público)}\n• Escritura: ${WRITE_LIST:-Según Permisos Generales}" 15 70); then
+                    --yesno "¿Confirmas la creación del recurso con los siguientes parámetros?\n\n• Nombre:      [$NOMBRE_SHARE]\n• Visibilidad: $VIS_TXT\n• Ruta Disco:   $RUTA_SHARE\n• Esquema:     $TIPO_TXT\n• Acceso:      ${VALID_USERS:-Invitados (Público)}\n• Escritura:   ${WRITE_LIST:-Según Permisos Generales}\n\n• Ruta de red: \\\\${SERVER_IP}\\$NOMBRE_SHARE" 17 72); then
                     
                     mkdir -p "$RUTA_SHARE"
                     if [ "$TIPO_PERM" == "1" ]; then
@@ -642,7 +661,7 @@ for name, d in shares.items():
 [$NOMBRE_SHARE]
    comment = $COMENTARIO
    path = $RUTA_SHARE
-   browseable = yes
+   browseable = $BROWSEABLE
    read only = $READ_ONLY
    guest ok = $GUEST_OK
 $([ -n "$VALID_USERS" ] && echo "   valid users = $VALID_USERS")
@@ -655,7 +674,7 @@ SMBCONF
                     testparm -s &>/dev/null || true
                     smbcontrol all reload-config 2>/dev/null || systemctl reload smbd 2>/dev/null || systemctl restart smbd 2>/dev/null || true
                     whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
-                        --msgbox "✔ ¡Recurso \"[$NOMBRE_SHARE]\" creado con éxito!\n\n• Ruta:      $RUTA_SHARE\n• Esquema:   $TIPO_TXT\n\nAccesible desde Windows en: \\\\${SERVER_IP}\\$NOMBRE_SHARE" 13 70
+                        --msgbox "✔ ¡Recurso \"[$NOMBRE_SHARE]\" creado con éxito!\n\n• Visibilidad: $VIS_TXT\n• Ruta Disco:  $RUTA_SHARE\n• Esquema:    $TIPO_TXT\n\nAccesible desde Windows en: \\\\${SERVER_IP}\\$NOMBRE_SHARE" 14 72
                 fi
                 ;;
 
