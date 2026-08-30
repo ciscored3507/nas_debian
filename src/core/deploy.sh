@@ -124,6 +124,19 @@ if [ -d "$SRC_DIR/web/backups" ]; then
     chmod -R 755 /usr/share/cockpit/backups
 fi
 
+# 4. Ocultar disco del sistema operativo de la interfaz de Almacenamiento (Cockpit Storage / UDisks2)
+ROOT_DEV_OS=$(findmnt -n -o SOURCE / 2>/dev/null || df / | tail -1 | awk '{print $1}')
+ROOT_DISK_OS=$(lsblk -no PKNAME "$ROOT_DEV_OS" 2>/dev/null || basename "$ROOT_DEV_OS")
+if [ -n "$ROOT_DISK_OS" ]; then
+    cat << UDEV_EOF > /etc/udev/rules.d/80-udisks2-hide-os.rules
+# Ocultar disco del sistema operativo ($ROOT_DISK_OS) de la interfaz de Almacenamiento (UDisks2 / Cockpit Storage)
+KERNEL=="${ROOT_DISK_OS}*", ENV{UDISKS_IGNORE}="1"
+UDEV_EOF
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger 2>/dev/null || true
+    systemctl restart udisks2 2>/dev/null || true
+fi
+
 # Parche WSDD2
 echo "WSDD2_OPTS=\"-N $SMB_NETBIOS -G $SMB_WORKGROUP -H $SMB_NETBIOS\"" > /etc/default/wsdd2
 mkdir -p /etc/systemd/system/wsdd2.service.d
