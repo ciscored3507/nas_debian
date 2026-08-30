@@ -20,12 +20,20 @@ function initTheme() {
 /* =================== API =================== */
 
 function runApi(args) {
-	return cockpit.spawn(["python3", API_PATH].concat(args), { superuser: "try" })
+	return cockpit.spawn(["python3", API_PATH].concat(args), { superuser: "try", err: "message" })
 		.then(function (out) {
-			return JSON.parse(out.trim());
+			try {
+				return JSON.parse(out.trim());
+			} catch (e) {
+				return { status: "error", message: "Respuesta inválida del servidor. " + String(e) };
+			}
 		})
 		.catch(function (err) {
-			return { status: "error", message: err.message || String(err) };
+			var msg = "Error desconocido";
+			if (err && err.message) msg = err.message;
+			else if (err && err.problem) msg = err.problem;
+			else msg = String(err);
+			return { status: "error", message: "Error interno: " + msg };
 		});
 }
 

@@ -97,22 +97,33 @@ def list_tasks():
     print(json.dumps({"status": "ok", "tasks": tasks}))
 
 def test_cifs(ip, share, user, password):
-    cmd = ["smbclient", f"//{ip}/{share}", f"-U{user}%{password}", "-c", "dir"]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode == 0:
-        print(json.dumps({"status": "ok", "message": "Conexión CIFS/SMB exitosa."}))
-    else:
-        err = res.stderr or res.stdout
-        print(json.dumps({"status": "error", "message": f"Error de conexión: {err.strip()}"}))
+    try:
+        env = os.environ.copy()
+        env["USER"] = user
+        env["PASSWD"] = password
+        cmd = ["timeout", "7", "smbclient", f"//{ip}/{share}", "-c", "dir"]
+        res = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        if res.returncode == 0:
+            print(json.dumps({"status": "ok", "message": "Conexión CIFS/SMB exitosa."}))
+        elif res.returncode == 124:
+            print(json.dumps({"status": "error", "message": "Error: Tiempo de espera agotado (7s). Verifica la IP."}))
+        else:
+            err = res.stderr or res.stdout
+            print(json.dumps({"status": "error", "message": f"Error de conexión: {err.strip()}"}))
+    except Exception as e:
+        print(json.dumps({"status": "error", "message": f"Excepción: {str(e)}"}))
 
 def test_ssh(ip, port, user, password):
-    cmd = ["sshpass", "-p", password, "ssh", "-p", str(port), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", f"{user}@{ip}", "echo OK"]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode == 0 and "OK" in res.stdout:
-        print(json.dumps({"status": "ok", "message": "Conexión SSH exitosa."}))
-    else:
-        err = res.stderr or res.stdout or "Tiempo de espera agotado"
-        print(json.dumps({"status": "error", "message": f"Error SSH: {err.strip()}"}))
+    try:
+        cmd = ["sshpass", "-p", password, "ssh", "-p", str(port), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=7", f"{user}@{ip}", "echo OK"]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode == 0 and "OK" in res.stdout:
+            print(json.dumps({"status": "ok", "message": "Conexión SSH exitosa."}))
+        else:
+            err = res.stderr or res.stdout or "Tiempo de espera agotado"
+            print(json.dumps({"status": "error", "message": f"Error SSH: {err.strip()}"}))
+    except Exception as e:
+        print(json.dumps({"status": "error", "message": f"Excepción: {str(e)}"}))
 
 def create_task(data):
     ensure_dirs()
