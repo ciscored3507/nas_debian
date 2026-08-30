@@ -114,7 +114,7 @@ for name, d in shares.items():
                     "4" "Acceso Público / Invitados (Sin requerir contraseña)" 3>&1 1>&2 2>&3)
                 if [ $? -ne 0 ] || [ -z "$TIPO_PERM" ]; then continue; fi
 
-                GRUPOS_DISP=$(awk -F: '($3 >= 1000 || $1 ~ /^grp_/) && $1 !~ /^(nogroup|nobody)$/ {print $1}' /etc/group | sort -u)
+                GRUPOS_DISP=$(awk -F: '$1 ~ /^grp_/ {print $1}' /etc/group | sort -u)
                 if [ "$TIPO_PERM" != "4" ] && [ -z "$GRUPOS_DISP" ]; then
                     whiptail --title "Sin Grupos" --ok-button "< Aceptar >" \
                         --msgbox "No hay grupos de seguridad creados.\nCrea primero un grupo desde la opción [2] del menú principal." 9 65

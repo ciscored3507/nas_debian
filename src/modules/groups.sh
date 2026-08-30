@@ -19,10 +19,13 @@ gestionar_grupos() {
 
         case "$OPC_GRP" in
             1)
-                LISTA_GRUPOS=$(awk -F: '($3 >= 1000 || $1 ~ /^grp_/) && $1 !~ /^(nogroup|nobody)$/ {printf "  • %-20s (GID: %s)\n", $1, $3}' /etc/group | sort)
-                [ -z "$LISTA_GRUPOS" ] && LISTA_GRUPOS="  (No se encontraron grupos personalizados)"
-                whiptail --title "Grupos de Seguridad del Sistema" --ok-button "< Aceptar >" \
-                    --msgbox "GRUPOS DISPONIBLES:\n\n$LISTA_GRUPOS" 18 60
+                LISTA_GRUPOS=$(awk -F: '$1 ~ /^grp_/ {
+                    miembros = ($4 != "") ? $4 : "(sin miembros)"
+                    printf "  • %-22s (GID: %-4s) | Miembros: %s\n", $1, $3, miembros
+                }' /etc/group | sort)
+                [ -z "$LISTA_GRUPOS" ] && LISTA_GRUPOS="  (No se encontraron grupos creados)"
+                whiptail --title "Grupos de Seguridad Creados" --ok-button "< Aceptar >" \
+                    --msgbox "GRUPOS CREADOS EN EL SISTEMA:\n\n$LISTA_GRUPOS" 18 72
                 ;;
 
             2)
@@ -31,6 +34,9 @@ gestionar_grupos() {
                     --inputbox "Ingresa el nombre del grupo (ej. grp_contabilidad o grp_ventas):" 10 65 "grp_" 3>&1 1>&2 2>&3)
                 if [ $? -eq 0 ] && [ -n "$NUEVO_GRP" ]; then
                     NUEVO_GRP=$(echo "$NUEVO_GRP" | tr ' ' '_' | tr -cd 'a-z0-9_-')
+                    if [[ "$NUEVO_GRP" != grp_* ]]; then
+                        NUEVO_GRP="grp_${NUEVO_GRP}"
+                    fi
                     if groupadd "$NUEVO_GRP" 2>/dev/null; then
                         whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
                             --msgbox "✔ Grupo \"$NUEVO_GRP\" creado exitosamente." 8 50

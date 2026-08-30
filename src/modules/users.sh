@@ -15,8 +15,8 @@ crear_usuario_guiado() {
         return
     fi
 
-    # Obtener grupos existentes en el sistema (grupos de seguridad grp_* y GID >= 1000)
-    GRUPOS_DISP=$(awk -F: '($3 >= 1000 || $1 ~ /^grp_/) && $1 !~ /^(nogroup|nobody)$/ {print $1}' /etc/group | sort -u)
+    # Obtener grupos de seguridad creados (grp_*)
+    GRUPOS_DISP=$(awk -F: '$1 ~ /^grp_/ {print $1}' /etc/group | sort -u)
 
     if [ -z "$GRUPOS_DISP" ]; then
         whiptail --title "Sin Grupos de Seguridad" --ok-button "< Aceptar >" \
@@ -129,7 +129,7 @@ gestionar_usuarios() {
                     --menu "Selecciona el usuario al que deseas modificar los grupos:" 16 68 6 \
                     $MENU_USERS 3>&1 1>&2 2>&3)
                 if [ $? -eq 0 ] && [ -n "$TARGET_USER" ]; then
-                    GRUPOS_DISP=$(awk -F: '($3 >= 1000 || $1 ~ /^grp_/) && $1 !~ /^(nogroup|nobody)$/ {print $1}' /etc/group | sort -u)
+                    GRUPOS_DISP=$(awk -F: '$1 ~ /^grp_/ {print $1}' /etc/group | sort -u)
                     LISTA_OPC=""
                     GRPS_ACTUALES=$(id -Gn "$TARGET_USER" 2>/dev/null)
                     for g in $GRUPOS_DISP; do
