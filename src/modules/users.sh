@@ -82,14 +82,15 @@ gestionar_usuarios() {
     while true; do
         OPC_USR=$(whiptail --title "$APP_TITLE" \
             --ok-button "< Seleccionar >" --cancel-button "< Volver >" \
-            --menu "GESTIÓN DE USUARIOS Y EMPLEADOS:" 17 72 5 \
+            --menu "GESTIÓN DE USUARIOS Y EMPLEADOS:" 18 72 6 \
             "1" "[*] Listar usuarios registrados y grupos asignados" \
             "2" "[+] Crear un nuevo usuario (Seleccionar grupos actuales)" \
             "3" "[#] Modificar grupos de un usuario existente" \
             "4" "[*] Cambiar contraseña de Samba a un usuario" \
-            "5" "[-] Eliminar un usuario del sistema" 3>&1 1>&2 2>&3)
+            "5" "[-] Eliminar un usuario del sistema" \
+            "6" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
 
-        if [ $? -ne 0 ]; then
+        if [ $? -ne 0 ] || [ "$OPC_USR" == "6" ]; then
             break
         fi
 

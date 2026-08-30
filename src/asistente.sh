@@ -3,8 +3,6 @@
 # ASISTENTE PRINCIPAL: Servidor NAS & Central de Respaldos (Debian 13)
 # ==============================================================================
 
-set -e
-
 # Asegurar emulación de terminal
 export TERM="${TERM:-xterm-256color}"
 
