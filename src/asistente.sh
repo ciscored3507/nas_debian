@@ -55,14 +55,34 @@ desinstalar_guiado() {
     fi
 }
 
+# Función para verificar si el servidor ya fue desplegado
+obtener_estado_despliegue() {
+    if [ -f /etc/samba/smb.conf ] && getent group grp_sistemas &>/dev/null && [ -d /srv/nas ]; then
+        local rol="ARCHIVOS"
+        if grep -qi "Servidor BACKUP" /etc/samba/smb.conf 2>/dev/null; then
+            rol="BACKUP"
+        fi
+        echo "$rol"
+    else
+        echo ""
+    fi
+}
+
 # ==============================================================================
 # MENÚ PRINCIPAL INTERACTIVO
 # ==============================================================================
 while true; do
+    ROL_ACTUAL=$(obtener_estado_despliegue)
+    if [ -n "$ROL_ACTUAL" ]; then
+        TAG_OPC1="[1]  [✔] Servidor Configurado (Rol: $ROL_ACTUAL)"
+    else
+        TAG_OPC1="[1]  Desplegar Servidor (NAS de Archivos o Central de Backup)"
+    fi
+
     OPCION=$(whiptail --title "$APP_TITLE" \
         --ok-button "< Seleccionar >" --cancel-button "< Salir >" \
         --menu "Selecciona una opción usando las flechas y presiona Enter:" 21 74 9 \
-        "1" "[1]  Desplegar Servidor (NAS de Archivos o Central de Backup)" \
+        "1" "$TAG_OPC1" \
         "2" "[2]  Gestión de Grupos de Seguridad (Crear / Listar / Eliminar)" \
         "3" "[3]  Gestión de Recursos Compartidos (Ver / Crear / Deshabilitar / Borrar)" \
         "4" "[4]  Gestión de Tareas de Backup (Windows / Linux / Local)" \
@@ -78,7 +98,14 @@ while true; do
     fi
 
     case "$OPCION" in
-        1) instalar_nas ;;
+        1)
+            if [ -n "$ROL_ACTUAL" ]; then
+                whiptail --title "Servidor Ya Configurado" --ok-button "< Aceptar >" \
+                    --msgbox "✔ Este servidor ya se encuentra DESPLEGADO y EN LÍNEA (Rol: $ROL_ACTUAL).\n\nPara administrar el servidor utiliza las siguientes opciones:\n • Crear grupos de seguridad:       Opción [2]\n • Crear carpetas compartidas ($):   Opción [3]\n • Programar copias de seguridad:   Opción [4]\n • Gestionar usuarios y accesos:    Opción [5]\n\n💡 Si deseas reconfigurar desde cero o cambiar el rol, primero debes ejecutar la opción [9] Desinstalar y Limpiar Servidor." 16 72
+            else
+                instalar_nas
+            fi
+            ;;
         2) gestionar_grupos ;;
         3) gestionar_recursos_compartidos ;;
         4) gestionar_backups ;;
