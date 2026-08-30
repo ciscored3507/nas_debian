@@ -1,11 +1,9 @@
 {
-    "version": 2.0,
-    "requires": {
-        "cockpit": "260"
-    },
+    "version": 0,
     "menu": {
-        "index": {
+        "backups": {
             "label": "Backups",
+            "path": "index.html",
             "order": 115
         }
     }

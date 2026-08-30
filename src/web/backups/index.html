@@ -1,296 +1,207 @@
 <!DOCTYPE html>
-<html lang="es" class="pf-v6-m-tabular-nums" id="backups-page">
+<html lang="es" data-theme="dark">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>Backups</title>
-    <link href="cockpit.css" type="text/css" rel="stylesheet" />
+    <link rel="stylesheet" type="text/css" href="./cockpit.css">
+    <link href="houston.css" type="text/css" rel="stylesheet">
+    <link href="fontawesome/css/all.min.css" rel="stylesheet">
     <script src="../base1/cockpit.js"></script>
+    <script src="../manifests.js"></script>
+    <script src="main.js" type="module"></script>
     <style>
-        :root {
-            --ct-bg-dark: #151515;
-            --ct-card-bg: #212427;
-            --ct-card-header: #1c1e21;
-            --ct-border: #3c3f42;
-            --ct-text: #f0f0f0;
-            --ct-text-muted: #8a8d90;
-            --ct-blue: #06c;
-            --ct-blue-hover: #004080;
-            --ct-green: #3e8635;
-            --ct-green-hover: #2e6627;
-            --ct-red: #c9190b;
-        }
-
         body {
-            padding: 24px;
+            background-color: var(--navigation);
+            color: var(--font);
+            font-family: RedHatText, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             margin: 0;
+            padding: 24px;
             box-sizing: border-box;
-            background-color: var(--ct-bg-dark);
-            color: var(--ct-text);
-            font-family: RedHatText, "Red Hat Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            -webkit-font-smoothing: antialiased;
         }
 
-        .ct-container {
+        .outer-wrapper {
             max-width: 1200px;
             margin: 0 auto;
         }
 
-        .ct-header {
+        .page-head {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--ct-border);
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .ct-header h1 {
+        .page-head h1 {
+            margin: 0 0 4px 0;
             font-size: 22px;
             font-weight: 700;
-            margin: 0 0 4px 0;
-            color: #ffffff;
         }
 
-        .ct-header p {
+        .page-head p {
             margin: 0;
-            font-size: 13.5px;
-            color: var(--ct-text-muted);
+            font-size: 13px;
+            color: var(--font);
+            opacity: 0.7;
         }
 
-        /* Tabs */
-        .ct-tabs {
+        .tab-bar {
             display: flex;
             gap: 8px;
-            margin-bottom: 24px;
-            border-bottom: 1px solid var(--ct-border);
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .ct-tab-btn {
+        .ct-tab-item {
             background: transparent;
             border: none;
             border-bottom: 3px solid transparent;
-            color: var(--ct-text-muted);
+            color: var(--font);
+            opacity: 0.7;
             padding: 10px 18px;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease-in-out;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .ct-tab-btn:hover {
-            color: #ffffff;
-            border-bottom-color: #6a6e73;
+        .ct-tab-item:hover {
+            opacity: 1;
+            border-bottom-color: var(--border);
         }
 
-        .ct-tab-btn.active {
-            color: var(--ct-blue);
-            border-bottom-color: var(--ct-blue);
+        .ct-tab-item.active {
+            opacity: 1;
+            color: #06c;
+            border-bottom-color: #06c;
         }
 
-        /* Cards */
-        .ct-card {
-            background: var(--ct-card-bg);
-            border: 1px solid var(--ct-border);
-            border-radius: 6px;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-            overflow: hidden;
+        .box-card {
+            background: var(--container);
+            border: 1px solid var(--border);
+            border-radius: var(--nav-border-radius, 4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             margin-bottom: 24px;
+            overflow: hidden;
         }
 
-        .ct-card-header {
-            background: var(--ct-card-header);
+        .box-card-header {
+            background: var(--list-view-header);
             padding: 14px 20px;
-            border-bottom: 1px solid var(--ct-border);
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .ct-card-title {
+        .box-card-header h3 {
+            margin: 0;
             font-size: 15px;
             font-weight: 700;
-            margin: 0;
-            color: #ffffff;
         }
 
-        .ct-card-body {
+        .box-card-body {
             padding: 22px;
         }
 
-        /* Table */
-        .ct-table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-
-        .ct-table th {
-            background: #181b1e;
-            color: var(--ct-text-muted);
-            font-size: 11.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            padding: 12px 16px;
-            font-weight: 700;
-            border-bottom: 1px solid var(--ct-border);
-        }
-
-        .ct-table td {
-            padding: 14px 16px;
-            border-bottom: 1px solid #2d3034;
-            font-size: 13.5px;
-            vertical-align: middle;
-        }
-
-        .ct-table tr:hover td {
-            background: rgba(255, 255, 255, 0.03);
-        }
-
-        /* Protocol Grid */
-        .ct-proto-grid {
+        .proto-selector {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
+            gap: 14px;
             margin-bottom: 24px;
         }
 
-        .ct-proto-card {
-            background: #181b1e;
-            border: 2px solid var(--ct-border);
+        .proto-box {
+            background: var(--navigation);
+            border: 2px solid var(--border);
             border-radius: 6px;
             padding: 18px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s ease-in-out;
             text-align: center;
         }
 
-        .ct-proto-card:hover {
-            border-color: #555b63;
+        .proto-box:hover {
+            border-color: #06c;
         }
 
-        .ct-proto-card.active {
-            border-color: var(--ct-blue);
+        .proto-box.selected {
+            border-color: #06c;
             background: rgba(0, 102, 204, 0.12);
         }
 
-        .ct-proto-card h4 {
+        .proto-box h4 {
             margin: 0 0 6px 0;
             font-size: 15px;
             font-weight: 600;
-            color: #ffffff;
         }
 
-        .ct-proto-card p {
+        .proto-box p {
             margin: 0;
             font-size: 12px;
-            color: var(--ct-text-muted);
+            opacity: 0.7;
             line-height: 1.4;
         }
 
-        /* Form Layout */
-        .ct-form-grid {
+        .form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px 20px;
         }
 
-        .ct-form-group {
+        .form-group {
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
 
-        .ct-form-group.full-width {
+        .form-group.full-width {
             grid-column: span 2;
         }
 
-        .ct-label {
-            font-size: 12.5px;
+        .form-group label {
+            font-size: 13px;
             font-weight: 600;
-            color: #d2d2d2;
         }
 
-        .ct-input, .ct-select {
-            background: #151515;
-            border: 1px solid var(--ct-border);
-            color: #ffffff;
+        .input-text {
+            background: var(--navigation);
+            border: 1px solid var(--border);
+            color: var(--font);
             padding: 9px 12px;
             border-radius: 4px;
             font-size: 13.5px;
             outline: none;
-            transition: border-color 0.15s;
+            box-sizing: border-box;
+            width: 100%;
         }
 
-        .ct-input:focus, .ct-select:focus {
-            border-color: var(--ct-blue);
-            box-shadow: 0 0 0 1px var(--ct-blue);
+        .input-text:focus {
+            border-color: #06c;
+            box-shadow: 0 0 0 1px #06c;
         }
 
-        /* Badges */
-        .ct-badge {
+        .badge {
             display: inline-flex;
             align-items: center;
+            gap: 5px;
             padding: 3px 10px;
             border-radius: 12px;
             font-size: 11.5px;
             font-weight: 600;
         }
 
-        .ct-badge-success { background: rgba(62, 134, 53, 0.2); color: #5ba352; border: 1px solid rgba(62, 134, 53, 0.4); }
-        .ct-badge-pending { background: rgba(240, 171, 0, 0.2); color: #f0ab00; border: 1px solid rgba(240, 171, 0, 0.4); }
-        .ct-badge-error   { background: rgba(201, 25, 11, 0.2); color: #c9190b; border: 1px solid rgba(201, 25, 11, 0.4); }
-        .ct-badge-proto   { background: #2c3035; color: #f0f0f0; border: 1px solid #43484f; }
+        .badge-success { background: rgba(46, 160, 67, 0.2); color: #3fb950; border: 1px solid rgba(46, 160, 67, 0.4); }
+        .badge-pending { background: rgba(210, 153, 34, 0.2); color: #e3b341; border: 1px solid rgba(210, 153, 34, 0.4); }
+        .badge-danger  { background: rgba(248, 81, 73, 0.2); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.4); }
+        .badge-proto   { background: var(--border); color: var(--font); }
 
-        /* Buttons */
-        .ct-btn {
-            background: #363a3e;
-            color: #ffffff;
-            border: 1px solid var(--ct-border);
-            padding: 7px 14px;
-            border-radius: 4px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.15s ease-in-out;
-        }
-
-        .ct-btn:hover {
-            background: #44494f;
-            border-color: #555b63;
-        }
-
-        .ct-btn-primary {
-            background: var(--ct-green);
-            border-color: var(--ct-green);
-        }
-
-        .ct-btn-primary:hover {
-            background: var(--ct-green-hover);
-            border-color: var(--ct-green-hover);
-        }
-
-        .ct-btn-danger {
-            background: rgba(201, 25, 11, 0.2);
-            color: #ff6b6b;
-            border-color: rgba(201, 25, 11, 0.4);
-        }
-
-        .ct-btn-danger:hover {
-            background: var(--ct-red);
-            color: #ffffff;
-        }
-
-        .ct-btn-sm {
-            padding: 4px 10px;
-            font-size: 12px;
-        }
-
-        /* Banner */
-        .ct-banner {
+        .alert {
             padding: 12px 16px;
             border-radius: 4px;
             font-size: 13.5px;
@@ -299,42 +210,38 @@
             align-items: center;
             gap: 10px;
         }
+        .alert-info    { background: rgba(0, 102, 204, 0.15); border: 1px solid rgba(0, 102, 204, 0.4); color: #79c0ff; }
+        .alert-success { background: rgba(46, 160, 67, 0.15); border: 1px solid rgba(46, 160, 67, 0.4); color: #56d364; }
+        .alert-danger  { background: rgba(248, 81, 73, 0.15); border: 1px solid rgba(248, 81, 73, 0.4); color: #ff7b72; }
 
-        .ct-banner-info    { background: rgba(0, 102, 204, 0.15); border: 1px solid rgba(0, 102, 204, 0.4); color: #79c0ff; }
-        .ct-banner-success { background: rgba(62, 134, 53, 0.2); border: 1px solid rgba(62, 134, 53, 0.4); color: #56d364; }
-        .ct-banner-error   { background: rgba(201, 25, 11, 0.2); border: 1px solid rgba(201, 25, 11, 0.4); color: #ff7b72; }
-
-        /* Terminal Console */
-        .ct-terminal {
-            background: #0b0d0e;
-            border: 1px solid #2d3034;
-            border-radius: 4px;
-            padding: 16px;
+        .terminal {
+            background: #000000;
+            color: #38ef7d;
             font-family: monospace;
             font-size: 13px;
             line-height: 1.5;
-            color: #38ef7d;
+            padding: 16px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
             height: 420px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-all;
         }
 
-        /* Modal */
-        .ct-modal-wrap {
+        .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(2px);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 9999;
         }
 
-        .ct-modal-panel {
-            background: var(--ct-card-bg);
-            border: 1px solid var(--ct-border);
+        .modal-box {
+            background: var(--container);
+            border: 1px solid var(--border);
             border-radius: 6px;
             width: 780px;
             max-width: 92vw;
@@ -345,44 +252,32 @@
 </head>
 <body>
 
-    <div class="ct-container">
-        <!-- Page Header -->
-        <div class="ct-header">
+    <div class="outer-wrapper">
+        <div class="page-head">
             <div>
-                <h1>🛡️ Copias de Seguridad (Backups)</h1>
-                <p>Gestión automatizada de respaldos multiplataforma con deduplicación por enlaces duros (*hardlinks*)</p>
+                <h1><i class="fas fa-shield-alt" style="color: #06c;"></i> Copias de Seguridad (Backups)</h1>
+                <p>Motor automatizado de respaldos multiplataforma con deduplicación por enlaces duros (*hardlinks*)</p>
             </div>
             <div>
-                <button class="ct-btn" onclick="cargarTareas()">
-                    🔄 Refrescar
-                </button>
+                <button class="pf-c-button pf-m-secondary" id="btn-refresh"><i class="fas fa-sync-alt"></i> Actualizar</button>
             </div>
         </div>
 
-        <!-- Navigation Tabs -->
-        <div class="ct-tabs">
-            <button class="ct-tab-btn active" id="tab-btn-tasks" onclick="switchTab('tab-tasks', 'tab-btn-tasks')">
-                📋 Tareas Programadas
-            </button>
-            <button class="ct-tab-btn" id="tab-btn-new" onclick="switchTab('tab-new', 'tab-btn-new')">
-                ➕ Nueva Tarea de Backup
-            </button>
-            <button class="ct-tab-btn" id="tab-btn-logs" onclick="switchTab('tab-logs', 'tab-btn-logs')">
-                📜 Visor de Logs
-            </button>
+        <div class="tab-bar">
+            <button class="ct-tab-item active" id="tab-btn-tasks"><i class="fas fa-tasks"></i> Tareas Programadas</button>
+            <button class="ct-tab-item" id="tab-btn-new"><i class="fas fa-plus-circle"></i> Nueva Tarea de Backup</button>
+            <button class="ct-tab-item" id="tab-btn-logs"><i class="fas fa-history"></i> Visor de Logs</button>
         </div>
 
         <!-- TAB 1: Tareas Programadas -->
         <div id="tab-tasks" class="tab-pane">
-            <div class="ct-card">
-                <div class="ct-card-header">
-                    <h3 class="ct-card-title">Tareas de Respaldo Activas</h3>
-                    <button class="ct-btn ct-btn-primary ct-btn-sm" onclick="switchTab('tab-new', 'tab-btn-new')">
-                        + Nueva Tarea
-                    </button>
+            <div class="box-card">
+                <div class="box-card-header">
+                    <h3>Tareas de Respaldo Activas</h3>
+                    <button class="pf-c-button pf-m-primary" id="btn-new-task-top"><i class="fas fa-plus"></i> Nueva Tarea</button>
                 </div>
                 <div style="overflow-x: auto;">
-                    <table class="ct-table">
+                    <table class="pf-c-table pf-m-grid-md" style="width: 100%;">
                         <thead>
                             <tr>
                                 <th>Identificador</th>
@@ -397,11 +292,7 @@
                             </tr>
                         </thead>
                         <tbody id="tasks-table-body">
-                            <tr>
-                                <td colspan="9" style="text-align: center; color: var(--ct-text-muted); padding: 30px;">
-                                    Cargando tareas de respaldo...
-                                </td>
-                            </tr>
+                            <tr><td colspan="9" style="text-align: center; padding: 25px;"><i class="fas fa-spinner fa-spin"></i> Cargando tareas de respaldo...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -410,81 +301,80 @@
 
         <!-- TAB 2: Nueva Tarea de Backup -->
         <div id="tab-new" class="tab-pane" style="display: none;">
-            <div class="ct-card">
-                <div class="ct-card-header">
-                    <h3 class="ct-card-title">Configurar Nueva Tarea de Copia de Seguridad</h3>
+            <div class="box-card">
+                <div class="box-card-header">
+                    <h3>Configurar Nueva Tarea de Copia de Seguridad</h3>
                 </div>
-                <div class="ct-card-body">
-                    
-                    <label class="ct-label" style="display: block; margin-bottom: 10px;">1. Selecciona el Tipo de Servidor u Origen:</label>
-                    <div class="ct-proto-grid">
-                        <div class="ct-proto-card active" id="card-cifs" onclick="selectProto('cifs')">
-                            <h4>🪟 Windows / SMB (CIFS)</h4>
+                <div class="box-card-body">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600;">1. Selecciona el Tipo de Servidor u Origen:</label>
+                    <div class="proto-selector">
+                        <div class="proto-box selected" id="card-cifs">
+                            <h4><i class="fab fa-windows"></i> Windows / SMB (CIFS)</h4>
                             <p>Respaldo de carpetas compartidas en servidores Windows o NAS</p>
                         </div>
-                        <div class="ct-proto-card" id="card-ssh" onclick="selectProto('ssh')">
-                            <h4>🐧 Servidor Linux (SSH)</h4>
+                        <div class="proto-box" id="card-ssh">
+                            <h4><i class="fab fa-linux"></i> Servidor Linux (SSH)</h4>
                             <p>Respaldo remoto por túnel seguro SSH y rsync</p>
                         </div>
-                        <div class="ct-proto-card" id="card-local" onclick="selectProto('local')">
-                            <h4>💻 Carpeta Local</h4>
+                        <div class="proto-box" id="card-local">
+                            <h4><i class="fas fa-hdd"></i> Carpeta Local</h4>
                             <p>Respaldo de un directorio físico de este servidor</p>
                         </div>
                     </div>
 
-                    <div id="alert-test" class="ct-banner ct-banner-info" style="display: none;"></div>
+                    <div id="alert-test" class="alert alert-info" style="display: none;"></div>
 
-                    <label class="ct-label" style="display: block; margin-bottom: 12px; font-size: 14px;">2. Parámetros de Conexión y Retención:</label>
-                    
-                    <form onsubmit="event.preventDefault();">
-                        <div class="ct-form-grid">
-                            <div class="ct-form-group full-width">
-                                <label class="ct-label">Identificador Único de la Tarea:</label>
-                                <input class="ct-input" type="text" id="task-id" placeholder="ej. srv_ad_contabilidad" required>
+                    <label style="display: block; margin-bottom: 12px; font-weight: 600;">2. Parámetros de Conexión y Retención:</label>
+
+                    <form id="form-new-task">
+                        <div class="form-grid">
+                            <div class="form-group full-width">
+                                <label for="task-id">Identificador Único de la Tarea:</label>
+                                <input class="input-text" type="text" id="task-id" placeholder="ej. srv_ad_contabilidad" required>
                             </div>
 
                             <!-- Campos CIFS / SSH -->
-                            <div class="ct-form-group field-remote">
-                                <label class="ct-label">Dirección IP o Nombre del Servidor:</label>
-                                <input class="ct-input" type="text" id="task-ip" placeholder="ej. 10.10.1.50">
+                            <div class="form-group field-remote">
+                                <label for="task-ip">Dirección IP o Nombre del Servidor:</label>
+                                <input class="input-text" type="text" id="task-ip" placeholder="ej. 10.10.1.50">
                             </div>
 
-                            <div class="ct-form-group field-cifs">
-                                <label class="ct-label">Nombre del Recurso Compartido Windows:</label>
-                                <input class="ct-input" type="text" id="task-share" placeholder="ej. Documentos o Contabilidad$">
+                            <div class="form-group field-cifs">
+                                <label for="task-share">Nombre del Recurso Compartido Windows:</label>
+                                <input class="input-text" type="text" id="task-share" placeholder="ej. Documentos o Contabilidad$">
                             </div>
 
-                            <div class="ct-form-group field-ssh" style="display: none;">
-                                <label class="ct-label">Puerto SSH:</label>
-                                <input class="ct-input" type="number" id="task-port" value="22">
+                            <div class="form-group field-ssh" style="display: none;">
+                                <label for="task-port">Puerto SSH:</label>
+                                <input class="input-text" type="number" id="task-port" value="22">
                             </div>
 
-                            <div class="ct-form-group field-ssh" style="display: none;">
-                                <label class="ct-label">Ruta Remota en Servidor Linux:</label>
-                                <input class="ct-input" type="text" id="task-remote-path" placeholder="ej. /var/www o /srv/datos">
+                            <div class="form-group field-ssh" style="display: none;">
+                                <label for="task-remote-path">Ruta Remota en Servidor Linux:</label>
+                                <input class="input-text" type="text" id="task-remote-path" placeholder="ej. /var/www o /srv/datos">
                             </div>
 
                             <!-- Campos Locales -->
-                            <div class="ct-form-group full-width field-local" style="display: none;">
-                                <label class="ct-label">Ruta Física Local a Respaldar:</label>
-                                <input class="ct-input" type="text" id="task-local-path" value="/srv/nas/SISTEMAS">
+                            <div class="form-group full-width field-local" style="display: none;">
+                                <label for="task-local-path">Ruta Física Local a Respaldar:</label>
+                                <input class="input-text" type="text" id="task-local-path" value="/srv/nas/SISTEMAS">
                             </div>
 
                             <!-- Credenciales -->
-                            <div class="ct-form-group field-remote">
-                                <label class="ct-label">Usuario con Acceso de Lectura:</label>
-                                <input class="ct-input" type="text" id="task-user" placeholder="ej. Administrador o root">
+                            <div class="form-group field-remote">
+                                <label for="task-user">Usuario con Acceso de Lectura:</label>
+                                <input class="input-text" type="text" id="task-user" placeholder="ej. Administrador o root">
                             </div>
 
-                            <div class="ct-form-group field-remote">
-                                <label class="ct-label">Contraseña:</label>
-                                <input class="ct-input" type="password" id="task-password" placeholder="••••••••••••">
+                            <div class="form-group field-remote">
+                                <label for="task-password">Contraseña:</label>
+                                <input class="input-text" type="password" id="task-password" placeholder="••••••••••••">
                             </div>
 
                             <!-- Programación y Retención -->
-                            <div class="ct-form-group">
-                                <label class="ct-label">Frecuencia de Ejecución Automática:</label>
-                                <select class="ct-select" id="task-cron-select" onchange="handleCronSelect(this.value)">
+                            <div class="form-group">
+                                <label for="task-cron-select">Frecuencia de Ejecución Automática:</label>
+                                <select class="input-text" id="task-cron-select">
                                     <option value="0 23 * * *">Diario a las 23:00 hrs (Recomendado)</option>
                                     <option value="0 */6 * * *">Cada 6 Horas</option>
                                     <option value="0 */12 * * *">Cada 12 Horas</option>
@@ -493,24 +383,20 @@
                                 </select>
                             </div>
 
-                            <div class="ct-form-group" id="group-custom-cron" style="display: none;">
-                                <label class="ct-label">Expresión Cron Personalizada:</label>
-                                <input class="ct-input" type="text" id="task-cron" value="0 23 * * *">
+                            <div class="form-group" id="group-custom-cron" style="display: none;">
+                                <label for="task-cron">Expresión Cron Personalizada:</label>
+                                <input class="input-text" type="text" id="task-cron" value="0 23 * * *">
                             </div>
 
-                            <div class="ct-form-group">
-                                <label class="ct-label">Retención de Snapshots (Deduplicados):</label>
-                                <input class="ct-input" type="number" id="task-retention" value="30" min="1" max="365">
+                            <div class="form-group">
+                                <label for="task-retention">Retención de Snapshots (Deduplicados):</label>
+                                <input class="input-text" type="number" id="task-retention" value="30" min="1" max="365">
                             </div>
                         </div>
 
                         <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-                            <button type="button" class="ct-btn field-remote" id="btn-test" onclick="probarConexion()">
-                                🔍 Probar Conexión en Vivo
-                            </button>
-                            <button type="button" class="ct-btn ct-btn-primary" id="btn-save" onclick="guardarTarea()">
-                                💾 Guardar y Programar Tarea
-                            </button>
+                            <button type="button" class="pf-c-button pf-m-secondary field-remote" id="btn-test"><i class="fas fa-search"></i> Probar Conexión</button>
+                            <button type="button" class="pf-c-button pf-m-primary" id="btn-save"><i class="fas fa-save"></i> Guardar y Programar Tarea</button>
                         </div>
                     </form>
                 </div>
@@ -519,240 +405,34 @@
 
         <!-- TAB 3: Visor de Logs -->
         <div id="tab-logs" class="tab-pane" style="display: none;">
-            <div class="ct-card">
-                <div class="ct-card-header">
+            <div class="box-card">
+                <div class="box-card-header">
                     <div style="display: flex; gap: 12px; align-items: center;">
-                        <label class="ct-label">Tarea a Consultar:</label>
-                        <select class="ct-select" id="log-task-select" onchange="verLogs(this.value)" style="min-width: 250px;"></select>
+                        <label for="log-task-select" style="font-weight: 600;">Tarea a Consultar:</label>
+                        <select class="input-text" id="log-task-select" style="min-width: 250px;"></select>
                     </div>
-                    <button class="ct-btn ct-btn-sm" onclick="verLogs(document.getElementById('log-task-select').value)">
-                        🔄 Refrescar Logs
-                    </button>
+                    <button class="pf-c-button pf-m-secondary" id="btn-refresh-logs"><i class="fas fa-sync-alt"></i> Refrescar Logs</button>
                 </div>
-                <div class="ct-card-body">
-                    <div class="ct-terminal" id="log-console">Selecciona una tarea para consultar su registro de actividad en vivo...</div>
+                <div class="box-card-body">
+                    <div class="terminal" id="log-console">Selecciona una tarea para consultar su registro de actividad en vivo...</div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modal para Logs -->
-    <div class="ct-modal-wrap" id="modal-logs">
-        <div class="ct-modal-panel">
+    <div class="modal-overlay" id="modal-logs">
+        <div class="modal-box">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <h3 style="margin: 0; font-size: 16px; color: #ffffff;" id="modal-log-title">Registro de Actividad</h3>
-                <button class="ct-btn ct-btn-sm" onclick="cerrarModal()">✕</button>
+                <h3 style="margin: 0; font-size: 16px;" id="modal-log-title">Registro de Actividad</h3>
+                <button class="pf-c-button pf-m-plain" id="btn-modal-x" style="font-size: 18px;">✕</button>
             </div>
-            <div class="ct-terminal" id="modal-log-console">Cargando registros...</div>
+            <div class="terminal" id="modal-log-console">Cargando registros...</div>
             <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
-                <button class="ct-btn" onclick="cerrarModal()">Cerrar</button>
+                <button class="pf-c-button pf-m-secondary" id="btn-close-modal">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <script>
-        const API_PATH = "/usr/share/cockpit/backups/backup_api.py";
-        let currentProto = "cifs";
-
-        function switchTab(paneId, btnId) {
-            document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.ct-tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(paneId).style.display = 'block';
-            document.getElementById(btnId).classList.add('active');
-            if (paneId === 'tab-tasks') cargarTareas();
-        }
-
-        function selectProto(proto) {
-            currentProto = proto;
-            document.querySelectorAll('.ct-proto-card').forEach(el => el.classList.remove('active'));
-            document.getElementById('card-' + proto).classList.add('active');
-
-            document.querySelectorAll('.field-cifs, .field-ssh, .field-local, .field-remote').forEach(el => el.style.display = 'none');
-
-            if (proto === 'cifs') {
-                document.querySelectorAll('.field-cifs, .field-remote').forEach(el => el.style.display = 'flex');
-            } else if (proto === 'ssh') {
-                document.querySelectorAll('.field-ssh, .field-remote').forEach(el => el.style.display = 'flex');
-            } else {
-                document.querySelectorAll('.field-local').forEach(el => el.style.display = 'flex');
-            }
-        }
-
-        function handleCronSelect(val) {
-            document.getElementById('group-custom-cron').style.display = (val === 'custom') ? 'flex' : 'none';
-        }
-
-        function runApi(args) {
-            return cockpit.spawn(["python3", API_PATH, ...args], { superuser: "try" })
-                .then(out => JSON.parse(out.trim()))
-                .catch(err => ({ status: "error", message: err.message || err }));
-        }
-
-        function cargarTareas() {
-            const tbody = document.getElementById('tasks-table-body');
-            const selectLog = document.getElementById('log-task-select');
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--ct-text-muted); padding: 20px;">Cargando...</td></tr>';
-
-            runApi(["list"]).then(res => {
-                if (res.status !== "ok" || !res.tasks || res.tasks.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--ct-text-muted); padding: 30px;">No hay tareas de backup programadas actualmente. Haz clic en "Nueva Tarea de Backup" para crear una.</td></tr>';
-                    selectLog.innerHTML = '<option value="">(Sin tareas creadas)</option>';
-                    return;
-                }
-
-                tbody.innerHTML = '';
-                selectLog.innerHTML = '';
-
-                res.tasks.forEach(t => {
-                    const opt = document.createElement('option');
-                    opt.value = t.id;
-                    opt.textContent = `${t.id} (${t.proto})`;
-                    selectLog.appendChild(opt);
-
-                    const tr = document.createElement('tr');
-                    let statusBadge = `<span class="ct-badge ct-badge-pending">${t.last_status}</span>`;
-                    if (t.last_status === 'Éxito') statusBadge = `<span class="ct-badge ct-badge-success">● Éxito</span>`;
-                    if (t.last_status === 'Fallo') statusBadge = `<span class="ct-badge ct-badge-error">✕ Fallo</span>`;
-
-                    tr.innerHTML = `
-                        <td><strong>${t.id}</strong></td>
-                        <td><span class="ct-badge ct-badge-proto">${t.proto}</span></td>
-                        <td><code style="color: #79c0ff;">${t.src}</code></td>
-                        <td><code>${t.cron}</code></td>
-                        <td>${t.retention} snaps</td>
-                        <td><strong>${t.snaps}</strong> en disco</td>
-                        <td>${t.last_run}</td>
-                        <td>${statusBadge}</td>
-                        <td style="text-align: right; white-space: nowrap;">
-                            <button class="ct-btn ct-btn-sm" onclick="ejecutarAhora('${t.id}')" title="Ejecutar Backup Inmediatamente">⚡ Ejecutar</button>
-                            <button class="ct-btn ct-btn-sm" onclick="abrirModalLogs('${t.id}')" title="Ver Historial de Logs">📄 Logs</button>
-                            <button class="ct-btn ct-btn-danger ct-btn-sm" onclick="eliminarTarea('${t.id}')" title="Eliminar Tarea">🗑️</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            });
-        }
-
-        function probarConexion() {
-            const alertBox = document.getElementById('alert-test');
-            alertBox.style.display = 'flex';
-            alertBox.className = 'ct-banner ct-banner-info';
-            alertBox.textContent = '⏳ Probando conexión en vivo con el servidor remoto...';
-
-            const payload = {
-                ip: document.getElementById('task-ip').value,
-                user: document.getElementById('task-user').value,
-                password: document.getElementById('task-password').value
-            };
-
-            let action = "test_cifs";
-            if (currentProto === "cifs") {
-                payload.share = document.getElementById('task-share').value;
-            } else if (currentProto === "ssh") {
-                action = "test_ssh";
-                payload.port = document.getElementById('task-port').value;
-            }
-
-            runApi([action, JSON.stringify(payload)]).then(res => {
-                if (res.status === "ok") {
-                    alertBox.className = 'ct-banner ct-banner-success';
-                    alertBox.textContent = '✔ ' + res.message;
-                } else {
-                    alertBox.className = 'ct-banner ct-banner-error';
-                    alertBox.textContent = '✕ ' + res.message;
-                }
-            });
-        }
-
-        function guardarTarea() {
-            const tid = document.getElementById('task-id').value.trim();
-            if (!tid) { alert('Por favor ingresa un identificador para la tarea.'); return; }
-
-            const cronSelect = document.getElementById('task-cron-select').value;
-            const cronExpr = (cronSelect === 'custom') ? document.getElementById('task-cron').value : cronSelect;
-
-            const payload = {
-                id: tid,
-                proto: currentProto,
-                cron: cronExpr,
-                retention: parseInt(document.getElementById('task-retention').value) || 30
-            };
-
-            if (currentProto === 'cifs') {
-                payload.ip = document.getElementById('task-ip').value;
-                payload.share = document.getElementById('task-share').value;
-                payload.user = document.getElementById('task-user').value;
-                payload.password = document.getElementById('task-password').value;
-            } else if (currentProto === 'ssh') {
-                payload.ip = document.getElementById('task-ip').value;
-                payload.port = document.getElementById('task-port').value;
-                payload.path = document.getElementById('task-remote-path').value;
-                payload.user = document.getElementById('task-user').value;
-                payload.password = document.getElementById('task-password').value;
-            } else {
-                payload.path = document.getElementById('task-local-path').value;
-            }
-
-            document.getElementById('btn-save').textContent = '⏳ Guardando...';
-
-            runApi(["create", JSON.stringify(payload)]).then(res => {
-                document.getElementById('btn-save').textContent = '💾 Guardar y Programar Tarea';
-                if (res.status === "ok") {
-                    alert('✔ ' + res.message);
-                    switchTab('tab-tasks', 'tab-btn-tasks');
-                } else {
-                    alert('✕ Error: ' + res.message);
-                }
-            });
-        }
-
-        function ejecutarAhora(taskId) {
-            if (!confirm(`¿Deseas iniciar la ejecución del respaldo de la tarea [${taskId}] ahora mismo en segundo plano?`)) return;
-            cockpit.spawn(["bash", `/usr/local/bin/backup_${taskId}.sh`], { superuser: "try" })
-                .then(() => {
-                    alert(`✔ Tarea [${taskId}] finalizada.`);
-                    cargarTareas();
-                })
-                .catch(err => {
-                    alert(`✕ Error al ejecutar [${taskId}]: ${err.message || err}`);
-                    cargarTareas();
-                });
-            alert(`⚡ Backup [${taskId}] iniciado en segundo plano. Puedes consultar el progreso en los logs.`);
-            cargarTareas();
-        }
-
-        function eliminarTarea(taskId) {
-            if (!confirm(`¿Estás seguro de eliminar la tarea programada [${taskId}] y sus credenciales? (Los respaldos históricos en disco se conservarán).`)) return;
-            runApi(["delete", taskId]).then(res => {
-                alert(res.message);
-                cargarTareas();
-            });
-        }
-
-        function abrirModalLogs(taskId) {
-            document.getElementById('modal-log-title').textContent = `Registro de Actividad: ${taskId}`;
-            document.getElementById('modal-logs').style.display = 'flex';
-            document.getElementById('modal-log-console').textContent = 'Cargando logs...';
-            runApi(["logs", taskId]).then(res => {
-                document.getElementById('modal-log-console').textContent = res.logs || '(Sin registros)';
-            });
-        }
-
-        function verLogs(taskId) {
-            if (!taskId) return;
-            document.getElementById('log-console').textContent = 'Cargando...';
-            runApi(["logs", taskId]).then(res => {
-                document.getElementById('log-console').textContent = res.logs || '(Sin registros)';
-            });
-        }
-
-        function cerrarModal() {
-            document.getElementById('modal-logs').style.display = 'none';
-        }
-
-        // Carga inicial
-        cargarTareas();
-    </script>
 </body>
 </html>
