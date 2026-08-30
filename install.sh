@@ -40,8 +40,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "uninstall" ]; then
     echo -e "${C_YELLOW}[!] Desinstalando CLI 'nas' del sistema...${C_RESET}"
     rm -f "$BIN_PATH" /usr/local/bin/asistente_nas /usr/local/bin/asistente-nas
     if [ -d "$INSTALL_DIR" ]; then
-        if [ -f "$INSTALL_DIR/desinstalar_nas_ead.sh" ]; then
-            bash "$INSTALL_DIR/desinstalar_nas_ead.sh"
+        if [ -f "$INSTALL_DIR/src/core/uninstall.sh" ]; then
+            bash "$INSTALL_DIR/src/core/uninstall.sh"
         fi
         rm -rf "$INSTALL_DIR"
     fi
@@ -65,7 +65,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
     git remote set-url origin "$REPO_URL" 2>/dev/null || true
     git fetch -q origin main >/dev/null 2>&1 || true
     git reset -q --hard origin/main >/dev/null 2>&1 || true
-elif [ -f "$SCRIPT_DIR/asistente_nas.sh" ] && [ "$SCRIPT_DIR" != "$INSTALL_DIR" ] && [ -d "$SCRIPT_DIR/.git" ]; then
+elif [ -f "$SCRIPT_DIR/src/asistente.sh" ] && [ "$SCRIPT_DIR" != "$INSTALL_DIR" ] && [ -d "$SCRIPT_DIR/.git" ]; then
     rm -rf "$INSTALL_DIR"
     git clone -q "$SCRIPT_DIR" "$INSTALL_DIR" 2>/dev/null || cp -a "$SCRIPT_DIR" "$INSTALL_DIR"
     cd "$INSTALL_DIR" && git remote set-url origin "$REPO_URL" 2>/dev/null || true
@@ -74,7 +74,7 @@ else
     git clone -q "$REPO_URL" "$INSTALL_DIR"
 fi
 
-chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null || true
+chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR"/src/*.sh "$INSTALL_DIR"/src/**/*.sh 2>/dev/null || true
 git config --system --add safe.directory "$INSTALL_DIR" 2>/dev/null || git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
 echo -e " ${C_BOLD}[3/4]${C_RESET} Creando comando global del sistema ${C_GREEN}nas${C_RESET} en ${C_WHITE}$BIN_PATH${C_RESET}..."
@@ -105,21 +105,21 @@ case "$1" in
                 echo "✔ Ya tienes la última versión instalada ($(git log -1 --format='%h - %s (%cd)' --date=short))."
             else
                 git reset --hard origin/main
-                chmod +x "$INSTALL_DIR"/*.sh
+                chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR"/src/*.sh "$INSTALL_DIR"/src/**/*.sh 2>/dev/null || true
                 echo "✔ ¡Actualización completada con éxito a la versión $(git log -1 --format='%h - %s')!"
             fi
         else
             echo "[-] Error: No se encontró el repositorio en $INSTALL_DIR. Reinstalando..."
             git clone "$REPO_URL" "$INSTALL_DIR"
-            chmod +x "$INSTALL_DIR"/*.sh
+            chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR"/src/*.sh "$INSTALL_DIR"/src/**/*.sh 2>/dev/null || true
         fi
         exit 0
         ;;
 
     status|--status|-s)
-        if [ -f "$INSTALL_DIR/asistente_nas.sh" ]; then
+        if [ -f "$INSTALL_DIR/src/asistente.sh" ]; then
             export TERM="${TERM:-xterm-256color}"
-            bash "$INSTALL_DIR/asistente_nas.sh" --status 2>/dev/null || bash -c "
+            bash "$INSTALL_DIR/src/asistente.sh" --status 2>/dev/null || bash -c "
                 echo '=== ESTADO DEL SERVIDOR ==='
                 systemctl status smbd wsdd2 cockpit --no-pager
                 df -h /srv/nas 2>/dev/null || true
@@ -165,14 +165,14 @@ case "$1" in
         ;;
 
     *)
-        if [ -f "$INSTALL_DIR/asistente_nas.sh" ]; then
+        if [ -f "$INSTALL_DIR/src/asistente.sh" ]; then
             export TERM="${TERM:-xterm-256color}"
             if [ ! -t 0 ]; then
                 exec < /dev/tty 2>/dev/null || true
             fi
-            exec bash "$INSTALL_DIR/asistente_nas.sh" "$@"
+            exec bash "$INSTALL_DIR/src/asistente.sh" "$@"
         else
-            echo "[-] Error: No se encontró $INSTALL_DIR/asistente_nas.sh"
+            echo "[-] Error: No se encontró $INSTALL_DIR/src/asistente.sh"
             exit 1
         fi
         ;;

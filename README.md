@@ -210,28 +210,22 @@ systemctl status fail2ban
 
 ---
 
-### Paso 12: Ejecución del Asistente NAS (`asistente_nas.sh`)
+### Paso 12: Ejecución del Asistente NAS
 
-Una vez preparado el servidor, ejecuta el asistente visual interactivo:
+Una vez preparado el servidor, simplemente ejecuta el comando global del sistema:
 
 ```bash
-cd /home/jose/ead_nas_debian
-sudo bash asistente_nas.sh
+sudo nas
 ```
+*(O si estás dentro de la carpeta del proyecto: `sudo bash src/asistente.sh`)*
 
-#### Funcionalidades del Asistente:
-* **[1] Desplegar Servidor:** Configuración en 5 pasos para **Servidor de Archivos (NAS)** o **Central de Backup (Inmune a Ransomware)**.
-* **[2] Gestión de Grupos:** Creación y asignación de grupos departamentales o técnicos.
-* **[3] Gestión de Recursos Compartidos:** Creación, edición, deshabilitación y permisos de carpetas SMB.
+#### Módulos de Gestión del Asistente:
+* **[1] Desplegar Servidor:** Asistente en 5 pasos para **Servidor de Archivos (NAS)** o **Central de Backup (Inmune a Ransomware)**.
+* **[2] Gestión de Grupos:** Creación y asignación de grupos departamentales (`grp_*`).
+* **[3] Gestión de Recursos Compartidos:** Creación de recursos visibles u ocultos (`$`) con 4 esquemas de permisos granulares.
 * **[4] Gestión de Tareas de Backup:** Programación de copias incrementales deduplicadas (con *hardlinks*) para servidores Windows (CIFS), Linux (SSH) o carpetas locales.
-* **[5] Gestión de Usuarios:** Creación y control de acceso a empleados y cuentas técnicas.
-* **[6] Diagnóstico y Discos:** Monitoreo de espacio, servicios activos y tareas cron.
+* **[5] Gestión de Usuarios:** Creación y asignación de grupos mediante checklist dinámico y contraseñas de red Samba.
+* **[6] Diagnóstico y Discos:** Monitoreo en tiempo real de servicios, almacenamiento y tareas cron.
 * **[7] Reiniciar Servicios:** Recarga limpia de Samba, WSDD2 y Cockpit.
-* **[8] Desinstalar y Limpiar:** Restablecimiento total del sistema a su estado original.
-
----
-
-## 🛠 Documentación Adicional
-
-* [AGENTS.md](AGENTS.md) — Especificación técnica de arquitectura, parches de Debian 13 y notas de diseño.
-* [SMB_DEBIAN.md](SMB_DEBIAN.md) — Manual de replicación y procedimientos de restauración de copias de seguridad.
+* **[8] Buscar Actualizaciones:** Sincronización automática con las últimas mejoras de GitHub.
+* **[9] Desinstalar y Limpiar:** Restablecimiento total del sistema a su estado base.
