@@ -308,10 +308,23 @@ MOTD
 cp /etc/motd /etc/issue.net
 
 echo " [8/9] Recargando systemd y reiniciando servicios..."
-testparm -s
+testparm -s &>/dev/null || true
 systemctl daemon-reload
-systemctl restart smbd nmbd wsdd2 cockpit.socket cockpit.service
-systemctl enable smbd nmbd wsdd2 cockpit.socket
+systemctl restart smbd nmbd wsdd2 cockpit.socket cockpit.service 2>/dev/null || systemctl restart smbd nmbd wsdd2 cockpit.socket 2>/dev/null || true
+systemctl enable smbd nmbd wsdd2 cockpit.socket 2>/dev/null || true
+
+echo " [9/9] Verificando reglas de Firewall (UFW)..."
+if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -qw "active"; then
+    ufw allow 22/tcp comment 'SSH' 2>/dev/null || true
+    ufw allow 9090/tcp comment 'Cockpit Web Admin' 2>/dev/null || true
+    ufw allow 137,138/udp comment 'Samba NetBIOS' 2>/dev/null || true
+    ufw allow 139,445/tcp comment 'Samba SMB' 2>/dev/null || true
+    ufw allow 3702/udp comment 'WSDD2 WSD Discovery UDP' 2>/dev/null || true
+    ufw allow 3702/tcp comment 'WSDD2 WSD Discovery TCP' 2>/dev/null || true
+    ufw allow 5355/udp comment 'WSDD2 LLMNR UDP' 2>/dev/null || true
+    ufw allow 5355/tcp comment 'WSDD2 LLMNR TCP' 2>/dev/null || true
+    ufw allow 5357/tcp comment 'WSDD2 WSD HTTP' 2>/dev/null || true
+fi
 
 echo ""
 echo "=============================================================================="
@@ -319,7 +332,11 @@ echo " ✔ ¡DESPLIEGUE DEL SERVIDOR $SERVER_ROLE COMPLETADO CON ÉXITO!"
 echo "=============================================================================="
 echo " Rol del Servidor: $SERVER_ROLE"
 echo " Almacenamiento  : /srv/nas ($TARGET_DISK)"
-echo " Administrador   : $ADMIN_USER (con permisos sudo totales para Cockpit)"
+echo " Administrador   : $ADMIN_USER (con permisos sudo totales para Cockpit y Samba)"
 echo " Panel Web       : https://${SERVER_IP}:9090"
-echo " Red Windows     : \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)"
+if [ "$SERVER_ROLE" == "BACKUP" ]; then
+    echo " Repositorio CIFS: \\\\${SERVER_IP}\\BACKUPS_WINDOWS$ (Oculto - Inmune a Ransomware)"
+else
+    echo " Red Windows     : \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)"
+fi
 echo "=============================================================================="

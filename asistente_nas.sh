@@ -242,24 +242,17 @@ for item in final_items:
             --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
             --inputbox "Ingresa el nombre de usuario para el nuevo administrador:" 10 65 "admin_nas" 3>&1 1>&2 2>&3)
         if [ $? -ne 0 ] || [ -z "$ADMIN_USER" ]; then return; fi
-
-        while true; do
-            ADMIN_PASS=$(whiptail --title "Contraseña de Administrador" \
-                --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-                --passwordbox "Ingresa la contraseña obligatoria para el nuevo usuario $ADMIN_USER:" 10 65 3>&1 1>&2 2>&3)
-            if [ $? -ne 0 ]; then return; fi
-            if [ -n "$ADMIN_PASS" ]; then break; fi
-            whiptail --title "Error" --ok-button "< Aceptar >" --msgbox "La contraseña para un nuevo usuario no puede estar vacía." 8 50
-        done
-    else
-        ADMIN_PASS=$(whiptail --title "Contraseña de Administrador (Opcional)" \
-            --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-            --passwordbox "Contraseña para $ADMIN_USER (Deja en blanco para conservar la clave actual de Linux/Samba):" 10 72 3>&1 1>&2 2>&3)
-        if [ $? -ne 0 ]; then return; fi
     fi
 
-    DESC_PASS="[Conservar contraseña actual de Linux]"
-    [ -n "$ADMIN_PASS" ] && DESC_PASS="[Actualizar con nueva contraseña]"
+    while true; do
+        ADMIN_PASS=$(whiptail --title "Contraseña de Red Samba ($ADMIN_USER)" \
+            --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+            --passwordbox "Ingresa la contraseña de red para $ADMIN_USER (Requerida por Samba/Windows):" 10 70 3>&1 1>&2 2>&3)
+        if [ $? -ne 0 ]; then return; fi
+        if [ -n "$ADMIN_PASS" ]; then break; fi
+        whiptail --title "Contraseña Requerida" --ok-button "< Aceptar >" \
+            --msgbox "Samba requiere una contraseña para que Windows pueda autenticar y conectar a las carpetas compartidas." 9 65
+    done
 
     RESUMEN="PARAMETROS DE CONFIGURACION:
 * Funcion Principal    : $ROL_SERVER
@@ -267,11 +260,10 @@ for item in final_items:
 * Disco Almacenamiento : $DISCO_SELECCIONADO
 * Nombre del Servidor  : $SMB_NETBIOS
 * Grupo / Dominio      : $SMB_WORKGROUP
-* Administrador Web    : $ADMIN_USER (Permisos sudo totales)
-* Gestion Contraseña   : $DESC_PASS
+* Administrador Web    : $ADMIN_USER (Permisos sudo y Samba)
 
 INCLUYE PARCHES AUTOMATICOS:
-- Integracion Cockpit File Sharing y difusion WSDD2
+- Integracion Cockpit File Sharing y difusion WSDD2 / LLMNR
 - Wrappers de compatibilidad en espanol (chage / passwd / lastb)
 - Herramientas multiplataforma de Backup (CIFS, Rsync, SSHPass, Cron)
 
@@ -291,8 +283,13 @@ INCLUYE PARCHES AUTOMATICOS:
         local ret_exec=$?
         
         if [ $ret_exec -eq 0 ]; then
-            whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
-                --msgbox "✔ ¡Despliegue completado con éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://${SERVER_IP}:9090\n• Usuario Cockpit: $ADMIN_USER\n• Red Windows:     \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)" 13 70
+            if [ "$ROL_SERVER" == "BACKUP" ]; then
+                whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
+                    --msgbox "✔ ¡Central de Respaldos Desplegada con Éxito!\n\n• Panel Web Cockpit: https://${SERVER_IP}:9090\n• Usuario Admin:     $ADMIN_USER\n• Repositorio CIFS:  \\\\${SERVER_IP}\\BACKUPS_WINDOWS$\n\n🔒 SEGURIDAD CONTRA RANSOMWARE:\nLas carpetas de backup están OCULTAS (con sufijo $). Windows no las mostrará en la lista de red para protegerlas de ataques.\n\nPara conectar desde Windows, escribe en el Explorador de Archivos la ruta completa:\n\\\\${SERVER_IP}\\BACKUPS_WINDOWS$" 18 74
+            else
+                whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
+                    --msgbox "✔ ¡Servidor NAS Desplegado con Éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://${SERVER_IP}:9090\n• Usuario Admin:   $ADMIN_USER\n• Red Windows:     \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)\n\n💡 SIGUIENTE PASO:\nUtiliza las opciones [2] y [3] del menú para crear tus grupos y carpetas compartidas a medida." 16 72
+            fi
         else
             whiptail --title "Error en el Despliegue" --ok-button "< Aceptar >" \
                 --msgbox "✖ Ocurrió un error durante la ejecución del script de despliegue (Código de salida: $ret_exec).\n\nRevisa los mensajes anteriores en la consola." 12 70

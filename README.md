@@ -160,9 +160,12 @@ ufw allow 9090/tcp comment 'Cockpit Web Admin'
 ufw allow 137,138/udp comment 'Samba NetBIOS'
 ufw allow 139,445/tcp comment 'Samba SMB'
 
-# WSDD2 (Detección de equipos en red Windows)
-ufw allow 3702/udp comment 'WSDD2 WSD Discovery'
-ufw allow 5357/tcp comment 'WSDD2 LLMNR'
+# WSDD2 y LLMNR (Detección de equipos en red Windows WSD/LLMNR)
+ufw allow 3702/udp comment 'WSDD2 WSD Discovery UDP'
+ufw allow 3702/tcp comment 'WSDD2 WSD Discovery TCP'
+ufw allow 5355/udp comment 'WSDD2 LLMNR UDP'
+ufw allow 5355/tcp comment 'WSDD2 LLMNR TCP'
+ufw allow 5357/tcp comment 'WSDD2 WSD HTTP'
 
 # Activar firewall
 ufw --force enable
