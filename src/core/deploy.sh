@@ -135,6 +135,27 @@ UDEV_EOF
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger 2>/dev/null || true
     systemctl restart udisks2 2>/dev/null || true
+
+    # Parche Cockpit Storage (Ocultar unidades con HintIgnore)
+    python3 -c '
+import gzip, os
+
+path = "/usr/share/cockpit/storaged/storaged.js.gz"
+if os.path.exists(path):
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            content = f.read()
+        target1 = "if(o||(o=b.drives_multipath_blocks[t.path][0]),!o||Zr(b,o.path))return;"
+        repl1    = "if(o||(o=b.drives_multipath_blocks[t.path][0]),!o||Zr(b,o.path)||o.HintIgnore)return;"
+        target2 = "function yT(e,t){if(Zr(b,t.path))return;"
+        repl2    = "function yT(e,t){if(Zr(b,t.path)||t.HintIgnore)return;"
+        if target1 in content or target2 in content:
+            content = content.replace(target1, repl1).replace(target2, repl2)
+            with gzip.open(path, "wt", encoding="utf-8") as f:
+                f.write(content)
+    except:
+        pass
+' 2>/dev/null || true
 fi
 
 # Parche WSDD2
