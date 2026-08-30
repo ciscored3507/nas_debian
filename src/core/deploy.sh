@@ -1,0 +1,216 @@
+#!/bin/bash
+# ==============================================================================
+# Motor de Despliegue Automatizado Base (Debian 13)
+# ==============================================================================
+
+set -e
+
+if [ "$EUID" -ne 0 ]; then
+  echo "[-] Este script debe ejecutarse con privilegios de root (sudo bash $0)"
+  exit 1
+fi
+
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)"
+source "$LIB_DIR/colors.sh"
+source "$LIB_DIR/helpers.sh"
+
+TARGET_DISK="${1:-LOCAL}"
+SMB_WORKGROUP="${2:-$(obtener_workgroup_defecto)}"
+SMB_NETBIOS="${3:-$(obtener_netbios_defecto)}"
+ADMIN_USER="${4:-$(detect_default_user)}"
+ADMIN_PASS="${5:-}"
+SERVER_ROLE="${6:-ARCHIVOS}"
+
+SERVER_IP=$(obtener_ip_local)
+HOST_NAME_LOWER=$(echo "$SMB_NETBIOS" | tr 'A-Z' 'a-z')
+
+echo "=============================================================================="
+echo " INICIANDO DESPLIEGUE: $SERVER_ROLE (IP: $SERVER_IP)"
+echo " Servidor: $SMB_NETBIOS | Workgroup: $SMB_WORKGROUP | Admin: $ADMIN_USER"
+echo "=============================================================================="
+
+echo " [1/9] Actualizando repositorios e instalando paquetes base..."
+DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null 2>&1 || true
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    samba samba-common-bin wsdd2 smbclient \
+    cockpit cockpit-storaged cockpit-networkmanager cockpit-packagekit \
+    cifs-utils rsync sshpass cron parted ufw >/dev/null 2>&1
+
+echo " [2/9] Configurando almacenamiento (/srv/nas) en $TARGET_DISK..."
+mkdir -p /srv/nas
+
+ROOT_DEV=$(findmnt -n -o SOURCE / 2>/dev/null || df / | tail -1 | awk '{print $1}')
+ROOT_DISK=$(lsblk -no PKNAME "$ROOT_DEV" 2>/dev/null || echo "")
+[ -n "$ROOT_DISK" ] && ROOT_DISK="/dev/$ROOT_DISK"
+
+if [ "$TARGET_DISK" == "LOCAL" ] || [ "$TARGET_DISK" == "$ROOT_DEV" ] || [ "$TARGET_DISK" == "$ROOT_DISK" ]; then
+    echo "  -> Almacenamiento local configurado en la partición raíz."
+else
+    echo "  -> Inicializando y formateando disco dedicado: $TARGET_DISK"
+    umount "$TARGET_DISK"* 2>/dev/null || true
+    parted -s "$TARGET_DISK" mklabel gpt mkpart primary ext4 0% 100%
+    partprobe "$TARGET_DISK" 2>/dev/null || true
+    sleep 2
+
+    PART_NAS="${TARGET_DISK}1"
+    [ ! -b "$PART_NAS" ] && PART_NAS="${TARGET_DISK}p1"
+    [ ! -b "$PART_NAS" ] && PART_NAS="$TARGET_DISK"
+
+    mkfs.ext4 -F -L "NAS_DATA" "$PART_NAS"
+    UUID_NAS=$(blkid -s UUID -o value "$PART_NAS")
+
+    sed -i '\|/srv/nas|d' /etc/fstab
+    if [ -n "$UUID_NAS" ]; then
+        echo "UUID=$UUID_NAS /srv/nas ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+    else
+        echo "$PART_NAS /srv/nas ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+    fi
+    mount -a || mount /srv/nas 2>/dev/null || true
+fi
+
+echo " [3/9] Instalando extensiones de Cockpit (File Sharing, Identities, Navigator)..."
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
+
+install_deb_pkg() {
+    local url="$1"
+    local filename="$2"
+    if wget -q --spider "$url" 2>/dev/null; then
+        wget -q "$url" -O "$filename"
+        if [ -s "$filename" ]; then
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ./"$filename" >/dev/null 2>&1 || true
+        fi
+    fi
+}
+
+install_deb_pkg "https://github.com/45Drives/cockpit-file-sharing/releases/download/v3.3.4/cockpit-file-sharing_3.3.4-1focal_all.deb" "cockpit-file-sharing.deb"
+install_deb_pkg "https://github.com/45Drives/cockpit-identities/releases/download/v0.1.12/cockpit-identities_0.1.12-1focal_all.deb" "cockpit-identities.deb"
+install_deb_pkg "https://github.com/45Drives/cockpit-navigator/releases/download/v0.5.10/cockpit-navigator_0.5.10-1focal_all.deb" "cockpit-navigator.deb"
+
+cd /
+rm -rf "$TMP_DIR"
+
+# Parche WSDD2
+echo "WSDD2_OPTS=\"-N $SMB_NETBIOS -G $SMB_WORKGROUP -H $SMB_NETBIOS\"" > /etc/default/wsdd2
+mkdir -p /etc/systemd/system/wsdd2.service.d
+cat << WSDDOVERRIDE > /etc/systemd/system/wsdd2.service.d/override.conf
+[Service]
+ExecStart=
+ExecStart=/usr/sbin/wsdd2 \$WSDD2_OPTS
+WSDDOVERRIDE
+
+echo " [4/9] Creando grupo maestro Sistemas y configurando Administrador ($ADMIN_USER)..."
+groupadd -f grp_sistemas
+
+if ! id "$ADMIN_USER" &>/dev/null; then
+    adduser --disabled-password --gecos "" "$ADMIN_USER"
+fi
+
+usermod -aG sudo,adm,grp_sistemas "$ADMIN_USER"
+echo "$ADMIN_USER ALL=(ALL:ALL) ALL" > "/etc/sudoers.d/$ADMIN_USER"
+chmod 0440 "/etc/sudoers.d/$ADMIN_USER"
+
+if [ -n "$ADMIN_PASS" ]; then
+    echo "${ADMIN_USER}:${ADMIN_PASS}" | chpasswd
+    echo -e "${ADMIN_PASS}\n${ADMIN_PASS}" | smbpasswd -a -s "$ADMIN_USER" 2>/dev/null || true
+fi
+
+echo " [5/9] Preparando almacenamiento base en /srv/nas con permisos para Sistemas..."
+mkdir -p /srv/nas /srv/nas/BACKUPS_HISTORICOS /srv/nas/LOGS_BACKUP
+chown -R root:grp_sistemas /srv/nas
+chmod -R 2775 /srv/nas
+
+echo " [6/9] Configurando /etc/samba/smb.conf (Infraestructura Limpia)..."
+mkdir -p /etc/samba
+cat << SMBCONF > /etc/samba/smb.conf
+[global]
+   workgroup = $SMB_WORKGROUP
+   server string = Servidor $SERVER_ROLE $SMB_WORKGROUP
+   server role = standalone server
+   netbios name = $SMB_NETBIOS
+   security = user
+   map to guest = Never
+   server min protocol = SMB2_02
+   server smb encrypt = desired
+   dns proxy = no
+   include = registry
+
+   log file = /var/log/samba/log.%m
+   max log size = 1000
+   logging = file
+SMBCONF
+
+echo " [7/9] Aplicando parches de compatibilidad en español para Cockpit..."
+mkdir -p /root/.ssh "/home/$ADMIN_USER/.ssh" /etc/skel/.ssh /nonexistent/.ssh
+chmod 700 /root/.ssh "/home/$ADMIN_USER/.ssh" /etc/skel/.ssh 2>/dev/null || true
+chmod 755 /nonexistent/.ssh 2>/dev/null || true
+touch /var/log/btmp && chmod 660 /var/log/btmp
+
+mkdir -p /usr/local/sbin /usr/local/bin
+
+cat << 'CHAGE_WRAP' > /usr/local/sbin/chage
+#!/bin/bash
+exec /usr/bin/env LC_ALL=C LANG=C /usr/bin/chage "$@"
+CHAGE_WRAP
+chmod 755 /usr/local/sbin/chage
+
+cat << 'PASSWD_WRAP' > /usr/local/sbin/passwd
+#!/bin/bash
+if [ "$1" = "-S" ]; then
+    exec /usr/bin/env LC_ALL=C LANG=C /usr/bin/passwd "$@"
+fi
+exec /usr/bin/passwd "$@"
+PASSWD_WRAP
+chmod 755 /usr/local/sbin/passwd
+
+cat << 'LASTB_WRAP' > /usr/local/bin/lastb
+#!/bin/bash
+if [ -f /var/log/btmp ] && [ -s /var/log/btmp ]; then
+    /usr/bin/last -f /var/log/btmp "$@" 2>/dev/null || echo "btmp begins $(date -Iseconds)"
+else
+    echo "btmp begins $(date -Iseconds)"
+fi
+LASTB_WRAP
+chmod 755 /usr/local/bin/lastb
+ln -sf /usr/local/bin/lastb /usr/bin/lastb 2>/dev/null || true
+
+cat << MOTD > /etc/motd
+
+======================================================
+  SERVIDOR EAD-COL ($SERVER_ROLE) - IP: $SERVER_IP
+  * Panel Web   : https://${SERVER_IP}:9090
+  * Red Windows : \\${SERVER_IP} ($SMB_NETBIOS)
+======================================================
+
+MOTD
+cp /etc/motd /etc/issue.net
+
+echo " [8/9] Recargando systemd y reiniciando servicios..."
+testparm -s &>/dev/null || true
+systemctl daemon-reload
+systemctl restart smbd nmbd wsdd2 cockpit.socket cockpit.service 2>/dev/null || systemctl restart smbd nmbd wsdd2 cockpit.socket 2>/dev/null || true
+systemctl enable smbd nmbd wsdd2 cockpit.socket 2>/dev/null || true
+
+echo " [9/9] Verificando y asegurando reglas de Firewall (UFW)..."
+if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -qw "active"; then
+    ufw allow 22/tcp comment 'SSH' 2>/dev/null || true
+    ufw allow 9090/tcp comment 'Cockpit Web Admin' 2>/dev/null || true
+    ufw allow 137,138/udp comment 'Samba NetBIOS' 2>/dev/null || true
+    ufw allow 139,445/tcp comment 'Samba SMB' 2>/dev/null || true
+    ufw allow 3702/udp comment 'WSDD2 WSD Discovery UDP' 2>/dev/null || true
+    ufw allow 3702/tcp comment 'WSDD2 WSD Discovery TCP' 2>/dev/null || true
+    ufw allow 5355/udp comment 'WSDD2 LLMNR UDP' 2>/dev/null || true
+    ufw allow 5355/tcp comment 'WSDD2 LLMNR TCP' 2>/dev/null || true
+    ufw allow 5357/tcp comment 'WSDD2 WSD HTTP' 2>/dev/null || true
+fi
+
+echo ""
+echo "=============================================================================="
+echo " ✔ ¡DESPLIEGUE DEL SERVIDOR $SERVER_ROLE COMPLETADO CON ÉXITO!"
+echo "=============================================================================="
+echo " Rol del Servidor: $SERVER_ROLE"
+echo " Almacenamiento  : /srv/nas ($TARGET_DISK)"
+echo " Administrador   : $ADMIN_USER (con permisos sudo y Samba)"
+echo " Panel Web       : https://${SERVER_IP}:9090"
+echo " Red Windows     : \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)"
+echo "=============================================================================="

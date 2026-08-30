@@ -1,0 +1,375 @@
+#!/bin/bash
+# ==============================================================================
+# Módulo: Motor de Respaldos Multiplataforma y Deduplicación
+# ==============================================================================
+
+gestionar_backups() {
+    while true; do
+        OPC_BKP=$(whiptail --title "$APP_TITLE" \
+            --ok-button "< Seleccionar >" --cancel-button "< Volver >" \
+            --menu "GESTIÓN DE TAREAS DE COPIAS DE SEGURIDAD:" 17 72 5 \
+            "1" "[+] Nueva Tarea: Servidor Windows / Carpeta SMB (CIFS)" \
+            "2" "[+] Nueva Tarea: Servidor Linux Remoto (SSH + Rsync)" \
+            "3" "[+] Nueva Tarea: Carpeta Local del Servidor" \
+            "4" "[-] Eliminar una Tarea de Backup Programada" \
+            "5" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
+
+        if [ $? -ne 0 ] || [ "$OPC_BKP" == "5" ]; then
+            break
+        fi
+
+        case "$OPC_BKP" in
+            1)
+                # Respaldo de Servidor Windows (CIFS / SMB)
+                TASK_NAME=$(whiptail --title "Paso 1 de 5: Identificador de Tarea" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ingresa un nombre único para esta tarea (ej. srv_ad_contabilidad):" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
+                TASK_NAME=$(echo "$TASK_NAME" | tr " " "_" | tr -cd "A-Za-z0-9_-")
+
+                WIN_IP=$(whiptail --title "Paso 2 de 5: Servidor Windows Remoto" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Dirección IP o Nombre del Servidor Windows (ej. 10.10.1.50):" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$WIN_IP" ]; then continue; fi
+
+                WIN_SHARE=$(whiptail --title "Paso 3 de 5: Recurso Compartido Remoto" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Nombre de la carpeta compartida en Windows (ej. Documentos o C$):" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$WIN_SHARE" ]; then continue; fi
+                WIN_SHARE=$(echo "$WIN_SHARE" | tr -d '/')
+
+                WIN_USER=$(whiptail --title "Paso 4 de 5: Credenciales de Acceso" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Usuario de Windows con permisos de lectura (ej. Administrador o DOMINIO\\admin):" 10 65 "Administrador" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$WIN_USER" ]; then continue; fi
+
+                WIN_PASS=$(whiptail --title "Paso 4 de 5: Credenciales de Acceso" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --passwordbox "Contraseña para el usuario $WIN_USER:" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ]; then continue; fi
+
+                # Test de conexión en vivo con smbclient
+                if command -v smbclient &>/dev/null; then
+                    TEST_CONN=$(smbclient "//$WIN_IP/$WIN_SHARE" -U "$WIN_USER%$WIN_PASS" -c "dir" 2>&1 || true)
+                    if echo "$TEST_CONN" | grep -qiE "NT_STATUS_LOGON_FAILURE|NT_STATUS_BAD_NETWORK_NAME|NT_STATUS_UNSUCCESSFUL|Connection to .* failed"; then
+                        whiptail --title "Error de Conexión Remota" --ok-button "< Corregir >" \
+                            --msgbox "✖ No se pudo conectar al servidor Windows con los datos ingresados:\n\n$TEST_CONN\n\nVerifica la IP, el recurso compartido o las credenciales." 14 72
+                        continue
+                    fi
+                fi
+
+                CRON_SCHED=$(whiptail --title "Paso 5 de 5: Frecuencia de Ejecución" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el horario programado para ejecutar la copia de seguridad:" 16 70 4 \
+                    "1" "Diario a las 23:00 hrs (Recomendado para servidores)" \
+                    "2" "Cada 6 horas (00:00, 06:00, 12:00, 18:00)" \
+                    "3" "Cada hora en punto" \
+                    "4" "Personalizado (Expresión cron manual)" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$CRON_SCHED" ]; then continue; fi
+
+                case "$CRON_SCHED" in
+                    1) CRON_EXPR="0 23 * * *" ;;
+                    2) CRON_EXPR="0 */6 * * *" ;;
+                    3) CRON_EXPR="0 * * * *" ;;
+                    4) 
+                        CRON_EXPR=$(whiptail --title "Cron Personalizado" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                            --inputbox "Ingresa la expresión cron (Minuto Hora Día Mes DíaSemana):" 10 65 "0 2 * * *" 3>&1 1>&2 2>&3)
+                        if [ $? -ne 0 ] || [ -z "$CRON_EXPR" ]; then continue; fi
+                        ;;
+                esac
+
+                RETENTION=$(whiptail --title "Política de Retención de Snapshots" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Número de snapshots históricos a conservar antes de rotar:" 10 65 "30" 3>&1 1>&2 2>&3)
+                RETENTION=${RETENTION:-30}
+
+                # Crear credenciales protegidas
+                mkdir -p /etc/backup-credentials /mnt/backup_sources/"$TASK_NAME" /srv/nas/BACKUPS_HISTORICOS/"$TASK_NAME" /srv/nas/LOGS_BACKUP
+                CRED_FILE="/etc/backup-credentials/${TASK_NAME}.cred"
+                cat << CREDFILE > "$CRED_FILE"
+username=$WIN_USER
+password=$WIN_PASS
+CREDFILE
+                chmod 600 "$CRED_FILE"
+
+                # Generar script de respaldo
+                RUNNER="/usr/local/bin/backup_${TASK_NAME}.sh"
+                cat << 'RUNNER_EOF' > "$RUNNER"
+#!/bin/bash
+set -e
+TASK="TASK_NAME_PLACEHOLDER"
+SRC_IP="WIN_IP_PLACEHOLDER"
+SRC_SHARE="WIN_SHARE_PLACEHOLDER"
+CRED_FILE="CRED_FILE_PLACEHOLDER"
+MOUNT_POINT="/mnt/backup_sources/$TASK"
+BKP_DIR="/srv/nas/BACKUPS_HISTORICOS/$TASK"
+LOG_FILE="/srv/nas/LOGS_BACKUP/backup_${TASK}.log"
+RETENTION=RETENTION_PLACEHOLDER
+DATE_STR=$(date +%Y-%m-%d_%H%M%S)
+TARGET_SNAPSHOT="$BKP_DIR/snapshot_$DATE_STR"
+
+echo "=== INICIANDO BACKUP: $TASK ($DATE_STR) ===" >> "$LOG_FILE"
+
+mkdir -p "$MOUNT_POINT" "$BKP_DIR"
+umount "$MOUNT_POINT" 2>/dev/null || true
+
+# Montaje en solo lectura
+mount -t cifs "//$SRC_IP/$SRC_SHARE" "$MOUNT_POINT" -o credentials="$CRED_FILE",ro,iocharset=utf8,vers=3.0,sec=ntlmssp 2>> "$LOG_FILE"
+
+LAST_SNAPSHOT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+LINK_DEST_OPT=""
+if [ -n "$LAST_SNAPSHOT" ] && [ -d "$LAST_SNAPSHOT" ]; then
+    LINK_DEST_OPT="--link-dest=$LAST_SNAPSHOT"
+    echo " -> Deduplicando con hardlinks contra: $(basename "$LAST_SNAPSHOT")" >> "$LOG_FILE"
+fi
+
+rsync -a --delete $LINK_DEST_OPT "$MOUNT_POINT/" "$TARGET_SNAPSHOT/" >> "$LOG_FILE" 2>&1
+
+umount "$MOUNT_POINT" 2>/dev/null || true
+
+# Rotación de snapshots antiguos
+SNAPSHOT_COUNT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | wc -l)
+if [ "$SNAPSHOT_COUNT" -gt "$RETENTION" ]; then
+    OLDEST=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | tail -n +$(($RETENTION + 1)))
+    for old in $OLDEST; do
+        echo " -> Rotando y eliminando snapshot antiguo: $(basename "$old")" >> "$LOG_FILE"
+        rm -rf "$old"
+    done
+fi
+
+echo "=== BACKUP FINALIZADO CON ÉXITO: $DATE_STR ===" >> "$LOG_FILE"
+RUNNER_EOF
+
+                sed -i "s|TASK_NAME_PLACEHOLDER|$TASK_NAME|g" "$RUNNER"
+                sed -i "s|WIN_IP_PLACEHOLDER|$WIN_IP|g" "$RUNNER"
+                sed -i "s|WIN_SHARE_PLACEHOLDER|$WIN_SHARE|g" "$RUNNER"
+                sed -i "s|CRED_FILE_PLACEHOLDER|$CRED_FILE|g" "$RUNNER"
+                sed -i "s|RETENTION_PLACEHOLDER|$RETENTION|g" "$RUNNER"
+                chmod 750 "$RUNNER"
+
+                # Programar en Cron
+                echo "$CRON_EXPR root $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
+                chmod 644 "/etc/cron.d/backup_${TASK_NAME}"
+
+                whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                    --msgbox "✔ ¡Tarea de Backup \"[$TASK_NAME]\" creada y programada!\n\n• Origen:      \\\\$WIN_IP\\$WIN_SHARE (CIFS)\n• Destino:     /srv/nas/BACKUPS_HISTORICOS/$TASK_NAME\n• Frecuencia:  $CRON_EXPR\n• Retención:   $RETENTION snapshots con deduplicación" 14 72
+                ;;
+
+            2)
+                # Respaldo de Servidor Linux Remoto (SSH + Rsync)
+                TASK_NAME=$(whiptail --title "Paso 1 de 5: Identificador de Tarea" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ingresa un nombre único para esta tarea (ej. srv_linux_web):" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
+                TASK_NAME=$(echo "$TASK_NAME" | tr " " "_" | tr -cd "A-Za-z0-9_-")
+
+                LNX_IP=$(whiptail --title "Paso 2 de 5: Servidor Linux Remoto" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Dirección IP o Nombre del Servidor Linux Remoto:" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$LNX_IP" ]; then continue; fi
+
+                LNX_PORT=$(whiptail --title "Puerto SSH" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Puerto SSH del Servidor Remoto:" 10 65 "22" 3>&1 1>&2 2>&3)
+                LNX_PORT=${LNX_PORT:-22}
+
+                LNX_PATH=$(whiptail --title "Paso 3 de 5: Ruta Remota a Respaldar" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ruta absoluta en el servidor remoto (ej. /var/www o /etc):" 10 65 "/var/www" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$LNX_PATH" ]; then continue; fi
+
+                LNX_USER=$(whiptail --title "Paso 4 de 5: Credenciales SSH" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Usuario SSH en el servidor remoto:" 10 65 "root" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$LNX_USER" ]; then continue; fi
+
+                LNX_PASS=$(whiptail --title "Paso 4 de 5: Credenciales SSH" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --passwordbox "Contraseña SSH para el usuario $LNX_USER:" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ]; then continue; fi
+
+                CRON_SCHED=$(whiptail --title "Paso 5 de 5: Frecuencia de Ejecución" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona el horario programado para ejecutar la copia de seguridad:" 16 70 3 \
+                    "1" "Diario a las 02:00 hrs de la madrugada (Recomendado)" \
+                    "2" "Cada 12 horas" \
+                    "3" "Personalizado (Expresión cron manual)" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$CRON_SCHED" ]; then continue; fi
+
+                case "$CRON_SCHED" in
+                    1) CRON_EXPR="0 2 * * *" ;;
+                    2) CRON_EXPR="0 */12 * * *" ;;
+                    3) 
+                        CRON_EXPR=$(whiptail --title "Cron Personalizado" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                            --inputbox "Ingresa la expresión cron (Minuto Hora Día Mes DíaSemana):" 10 65 "0 3 * * *" 3>&1 1>&2 2>&3)
+                        if [ $? -ne 0 ] || [ -z "$CRON_EXPR" ]; then continue; fi
+                        ;;
+                esac
+
+                RETENTION=$(whiptail --title "Política de Retención" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Número de snapshots a conservar:" 10 65 "15" 3>&1 1>&2 2>&3)
+                RETENTION=${RETENTION:-15}
+
+                mkdir -p /etc/backup-credentials /srv/nas/BACKUPS_HISTORICOS/"$TASK_NAME" /srv/nas/LOGS_BACKUP
+                CRED_FILE="/etc/backup-credentials/${TASK_NAME}.cred"
+                echo "$LNX_PASS" > "$CRED_FILE"
+                chmod 600 "$CRED_FILE"
+
+                RUNNER="/usr/local/bin/backup_${TASK_NAME}.sh"
+                cat << 'RUNNER_EOF' > "$RUNNER"
+#!/bin/bash
+set -e
+TASK="TASK_NAME_PLACEHOLDER"
+SRC_IP="LNX_IP_PLACEHOLDER"
+SRC_PORT="LNX_PORT_PLACEHOLDER"
+SRC_PATH="LNX_PATH_PLACEHOLDER"
+SRC_USER="LNX_USER_PLACEHOLDER"
+CRED_FILE="CRED_FILE_PLACEHOLDER"
+BKP_DIR="/srv/nas/BACKUPS_HISTORICOS/$TASK"
+LOG_FILE="/srv/nas/LOGS_BACKUP/backup_${TASK}.log"
+RETENTION=RETENTION_PLACEHOLDER
+DATE_STR=$(date +%Y-%m-%d_%H%M%S)
+TARGET_SNAPSHOT="$BKP_DIR/snapshot_$DATE_STR"
+
+echo "=== INICIANDO BACKUP LINUX SSH: $TASK ($DATE_STR) ===" >> "$LOG_FILE"
+mkdir -p "$BKP_DIR"
+
+LAST_SNAPSHOT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+LINK_DEST_OPT=""
+if [ -n "$LAST_SNAPSHOT" ] && [ -d "$LAST_SNAPSHOT" ]; then
+    LINK_DEST_OPT="--link-dest=$LAST_SNAPSHOT"
+    echo " -> Deduplicando con hardlinks contra: $(basename "$LAST_SNAPSHOT")" >> "$LOG_FILE"
+fi
+
+PASS=$(cat "$CRED_FILE")
+sshpass -p "$PASS" rsync -avz -e "ssh -p $SRC_PORT -o StrictHostKeyChecking=no" --delete $LINK_DEST_OPT "$SRC_USER@$SRC_IP:$SRC_PATH/" "$TARGET_SNAPSHOT/" >> "$LOG_FILE" 2>&1
+
+SNAPSHOT_COUNT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | wc -l)
+if [ "$SNAPSHOT_COUNT" -gt "$RETENTION" ]; then
+    OLDEST=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | tail -n +$(($RETENTION + 1)))
+    for old in $OLDEST; do
+        echo " -> Rotando snapshot antiguo: $(basename "$old")" >> "$LOG_FILE"
+        rm -rf "$old"
+    done
+fi
+
+echo "=== BACKUP FINALIZADO CON ÉXITO: $DATE_STR ===" >> "$LOG_FILE"
+RUNNER_EOF
+
+                sed -i "s|TASK_NAME_PLACEHOLDER|$TASK_NAME|g" "$RUNNER"
+                sed -i "s|LNX_IP_PLACEHOLDER|$LNX_IP|g" "$RUNNER"
+                sed -i "s|LNX_PORT_PLACEHOLDER|$LNX_PORT|g" "$RUNNER"
+                sed -i "s|LNX_PATH_PLACEHOLDER|$LNX_PATH|g" "$RUNNER"
+                sed -i "s|LNX_USER_PLACEHOLDER|$LNX_USER|g" "$RUNNER"
+                sed -i "s|CRED_FILE_PLACEHOLDER|$CRED_FILE|g" "$RUNNER"
+                sed -i "s|RETENTION_PLACEHOLDER|$RETENTION|g" "$RUNNER"
+                chmod 750 "$RUNNER"
+
+                echo "$CRON_EXPR root $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
+                chmod 644 "/etc/cron.d/backup_${TASK_NAME}"
+
+                whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                    --msgbox "✔ ¡Tarea de Backup Linux \"[$TASK_NAME]\" creada!\n\n• Origen:      $LNX_USER@$LNX_IP:$LNX_PATH (SSH)\n• Destino:     /srv/nas/BACKUPS_HISTORICOS/$TASK_NAME\n• Frecuencia:  $CRON_EXPR\n• Retención:   $RETENTION snapshots deduplicados" 14 72
+                ;;
+
+            3)
+                # Respaldo de Carpeta Local
+                TASK_NAME=$(whiptail --title "Paso 1 de 4: Identificador de Tarea" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ingresa un nombre único para esta tarea local:" 10 65 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
+                TASK_NAME=$(echo "$TASK_NAME" | tr " " "_" | tr -cd "A-Za-z0-9_-")
+
+                LOC_SRC=$(whiptail --title "Paso 2 de 4: Ruta Origen Local" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Ruta física absoluta de la carpeta origen a respaldar:" 10 65 "/srv/nas/SISTEMAS" 3>&1 1>&2 2>&3)
+                if [ $? -ne 0 ] || [ -z "$LOC_SRC" ]; then continue; fi
+
+                CRON_EXPR=$(whiptail --title "Paso 3 de 4: Horario de Ejecución" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Expresión cron (por defecto a las 23:30 hrs diario):" 10 65 "30 23 * * *" 3>&1 1>&2 2>&3)
+                CRON_EXPR=${CRON_EXPR:-"30 23 * * *"}
+
+                RETENTION=$(whiptail --title "Paso 4 de 4: Retención" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --inputbox "Número de snapshots a retener:" 10 65 "30" 3>&1 1>&2 2>&3)
+                RETENTION=${RETENTION:-30}
+
+                mkdir -p /srv/nas/BACKUPS_HISTORICOS/"$TASK_NAME" /srv/nas/LOGS_BACKUP
+                RUNNER="/usr/local/bin/backup_${TASK_NAME}.sh"
+                cat << 'RUNNER_EOF' > "$RUNNER"
+#!/bin/bash
+set -e
+TASK="TASK_NAME_PLACEHOLDER"
+SRC_PATH="LOC_SRC_PLACEHOLDER"
+BKP_DIR="/srv/nas/BACKUPS_HISTORICOS/$TASK"
+LOG_FILE="/srv/nas/LOGS_BACKUP/backup_${TASK}.log"
+RETENTION=RETENTION_PLACEHOLDER
+DATE_STR=$(date +%Y-%m-%d_%H%M%S)
+TARGET_SNAPSHOT="$BKP_DIR/snapshot_$DATE_STR"
+
+echo "=== INICIANDO BACKUP LOCAL: $TASK ($DATE_STR) ===" >> "$LOG_FILE"
+mkdir -p "$BKP_DIR"
+
+LAST_SNAPSHOT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+LINK_DEST_OPT=""
+if [ -n "$LAST_SNAPSHOT" ] && [ -d "$LAST_SNAPSHOT" ]; then
+    LINK_DEST_OPT="--link-dest=$LAST_SNAPSHOT"
+    echo " -> Deduplicando con hardlinks contra: $(basename "$LAST_SNAPSHOT")" >> "$LOG_FILE"
+fi
+
+rsync -a --delete $LINK_DEST_OPT "$SRC_PATH/" "$TARGET_SNAPSHOT/" >> "$LOG_FILE" 2>&1
+
+SNAPSHOT_COUNT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | wc -l)
+if [ "$SNAPSHOT_COUNT" -gt "$RETENTION" ]; then
+    OLDEST=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | tail -n +$(($RETENTION + 1)))
+    for old in $OLDEST; do
+        echo " -> Rotando snapshot antiguo: $(basename "$old")" >> "$LOG_FILE"
+        rm -rf "$old"
+    done
+fi
+
+echo "=== BACKUP FINALIZADO: $DATE_STR ===" >> "$LOG_FILE"
+RUNNER_EOF
+
+                sed -i "s|TASK_NAME_PLACEHOLDER|$TASK_NAME|g" "$RUNNER"
+                sed -i "s|LOC_SRC_PLACEHOLDER|$LOC_SRC|g" "$RUNNER"
+                sed -i "s|RETENTION_PLACEHOLDER|$RETENTION|g" "$RUNNER"
+                chmod 750 "$RUNNER"
+
+                echo "$CRON_EXPR root $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
+                chmod 644 "/etc/cron.d/backup_${TASK_NAME}"
+
+                whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                    --msgbox "✔ ¡Tarea de Backup Local \"[$TASK_NAME]\" programada exitosamente!" 8 60
+                ;;
+
+            4)
+                # Eliminar tarea
+                TAREAS_DEL=$(ls -1 /usr/local/bin/backup_*.sh 2>/dev/null | sed "s|/usr/local/bin/backup_||; s|\.sh||" || echo "")
+                if [ -z "$TAREAS_DEL" ]; then
+                    whiptail --ok-button "< Aceptar >" --msgbox "No hay tareas para eliminar." 8 45
+                    continue
+                fi
+
+                MENU_DEL=""
+                for t in $TAREAS_DEL; do
+                    MENU_DEL="$MENU_DEL $t Tarea_Programada"
+                done
+
+                TASK_DEL_SEL=$(whiptail --title "Eliminar Tarea de Backup" \
+                    --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                    --menu "Selecciona la tarea que deseas eliminar:" 16 68 6 \
+                    $MENU_DEL 3>&1 1>&2 2>&3)
+
+                if [ $? -eq 0 ] && [ -n "$TASK_DEL_SEL" ]; then
+                    if (whiptail --title "Confirmar Eliminación de Tarea" \
+                        --yes-button "< Sí, Eliminar Tarea >" --no-button "< Cancelar >" \
+                        --yesno "¿Estás seguro de que deseas eliminar la tarea [$TASK_DEL_SEL] y sus credenciales?\n\n(Los respaldos históricos en disco no se borrarán)." 12 70); then
+                        
+                        rm -f "/usr/local/bin/backup_${TASK_DEL_SEL}.sh" "/etc/cron.d/backup_${TASK_DEL_SEL}" "/etc/backup-credentials/${TASK_DEL_SEL}.cred" "/mnt/backup_sources/${TASK_DEL_SEL}" 2>/dev/null || true
+                        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                            --msgbox "✔ Tarea [$TASK_DEL_SEL] eliminada exitosamente." 8 50
+                    fi
+                fi
+                ;;
+        esac
+    done
+}
