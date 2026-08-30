@@ -1,0 +1,203 @@
+#!/bin/bash
+# ==============================================================================
+# INSTALADOR OFICIAL: Servidor NAS & Central de Respaldos EAD-COL (Debian 13)
+# ==============================================================================
+# Uso remoto con One-Liner:
+#   curl -fsSL https://raw.githubusercontent.com/ciscored3507/nas_debian/main/install.sh | sudo bash
+# ==============================================================================
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="/opt/nas_debian"
+BIN_PATH="/usr/local/bin/nas"
+
+SSH_CHECK=$(ssh -T -o StrictHostKeyChecking=accept-new -o BatchMode=yes git@github.com 2>&1 || true)
+if echo "$SSH_CHECK" | grep -qi "successfully authenticated"; then
+    REPO_URL="git@github.com:ciscored3507/nas_debian.git"
+else
+    REPO_URL="https://github.com/ciscored3507/nas_debian.git"
+fi
+
+# Colores de consola
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_CYAN="\033[1;36m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_RED="\033[1;31m"
+C_WHITE="\033[1;37m"
+
+# 1. Comprobación de permisos de superusuario
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${C_RED}[-] Este instalador requiere privilegios de administrador.${C_RESET}"
+    echo -e "    Por favor ejecuta: ${C_BOLD}sudo bash $0${C_RESET} o utiliza ${C_BOLD}sudo${C_RESET} en el comando curl."
+    exit 1
+fi
+
+# Desinstalación si se especifica el flag --uninstall
+if [ "$1" == "--uninstall" ] || [ "$1" == "uninstall" ]; then
+    echo -e "${C_YELLOW}[!] Desinstalando CLI 'nas' del sistema...${C_RESET}"
+    rm -f "$BIN_PATH" /usr/local/bin/asistente_nas /usr/local/bin/asistente-nas
+    if [ -d "$INSTALL_DIR" ]; then
+        if [ -f "$INSTALL_DIR/desinstalar_nas_ead.sh" ]; then
+            bash "$INSTALL_DIR/desinstalar_nas_ead.sh"
+        fi
+        rm -rf "$INSTALL_DIR"
+    fi
+    echo -e "${C_GREEN}✔ El comando 'nas' y sus archivos han sido desinstalados completamente.${C_RESET}"
+    exit 0
+fi
+
+clear 2>/dev/null || true
+echo -e "${C_CYAN}"
+echo "  ╭──────────────────────────────────────────────────────────────────────────╮"
+echo "  │        INSTALADOR OFICIAL • SERVIDOR NAS & BACKUP EAD-COL (DEBIAN 13)    │"
+echo "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+
+echo -e " ${C_BOLD}[1/4]${C_RESET} Verificando e instalando herramientas base (git, curl, whiptail)..."
+DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null 2>&1 || true
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git curl wget whiptail ca-certificates >/dev/null 2>&1
+
+echo -e " ${C_BOLD}[2/4]${C_RESET} Descargando y sincronizando componentes en ${C_CYAN}$INSTALL_DIR${C_RESET}..."
+if [ -d "$INSTALL_DIR/.git" ]; then
+    cd "$INSTALL_DIR"
+    git remote set-url origin "$REPO_URL" 2>/dev/null || true
+    git fetch -q origin main >/dev/null 2>&1 || true
+    git reset -q --hard origin/main >/dev/null 2>&1 || true
+elif [ -f "$SCRIPT_DIR/asistente_nas.sh" ] && [ "$SCRIPT_DIR" != "$INSTALL_DIR" ] && [ -d "$SCRIPT_DIR/.git" ]; then
+    rm -rf "$INSTALL_DIR"
+    git clone -q "$SCRIPT_DIR" "$INSTALL_DIR" 2>/dev/null || cp -a "$SCRIPT_DIR" "$INSTALL_DIR"
+    cd "$INSTALL_DIR" && git remote set-url origin "$REPO_URL" 2>/dev/null || true
+else
+    rm -rf "$INSTALL_DIR"
+    git clone -q "$REPO_URL" "$INSTALL_DIR"
+fi
+
+chmod +x "$INSTALL_DIR"/*.sh 2>/dev/null || true
+git config --system --add safe.directory "$INSTALL_DIR" 2>/dev/null || git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+
+echo -e " ${C_BOLD}[3/4]${C_RESET} Creando comando global del sistema ${C_GREEN}nas${C_RESET} en ${C_WHITE}$BIN_PATH${C_RESET}..."
+cat << 'EOF' > "$BIN_PATH"
+#!/bin/bash
+# Wrapper CLI Global: nas
+INSTALL_DIR="/opt/nas_debian"
+REPO_URL="https://github.com/ciscored3507/nas_debian.git"
+
+if [ "$EUID" -ne 0 ]; then
+    echo "[-] El comando 'nas' requiere privilegios de administrador. Ejecuta: sudo nas $@"
+    exit 1
+fi
+
+git config --system --add safe.directory "$INSTALL_DIR" 2>/dev/null || git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+
+case "$1" in
+    update|--update|-u)
+        echo "=============================================================================="
+        echo " [★] Buscando e instalando actualizaciones desde GitHub..."
+        echo "=============================================================================="
+        if [ -d "$INSTALL_DIR/.git" ]; then
+            cd "$INSTALL_DIR"
+            git fetch origin main
+            CURRENT_REV=$(git rev-parse HEAD)
+            REMOTE_REV=$(git rev-parse origin/main)
+            if [ "$CURRENT_REV" == "$REMOTE_REV" ]; then
+                echo "✔ Ya tienes la última versión instalada ($(git log -1 --format='%h - %s (%cd)' --date=short))."
+            else
+                git reset --hard origin/main
+                chmod +x "$INSTALL_DIR"/*.sh
+                echo "✔ ¡Actualización completada con éxito a la versión $(git log -1 --format='%h - %s')!"
+            fi
+        else
+            echo "[-] Error: No se encontró el repositorio en $INSTALL_DIR. Reinstalando..."
+            git clone "$REPO_URL" "$INSTALL_DIR"
+            chmod +x "$INSTALL_DIR"/*.sh
+        fi
+        exit 0
+        ;;
+
+    status|--status|-s)
+        if [ -f "$INSTALL_DIR/asistente_nas.sh" ]; then
+            export TERM="${TERM:-xterm-256color}"
+            bash "$INSTALL_DIR/asistente_nas.sh" --status 2>/dev/null || bash -c "
+                echo '=== ESTADO DEL SERVIDOR ==='
+                systemctl status smbd wsdd2 cockpit --no-pager
+                df -h /srv/nas 2>/dev/null || true
+            "
+        fi
+        exit 0
+        ;;
+
+    version|--version|-v)
+        if [ -d "$INSTALL_DIR/.git" ]; then
+            cd "$INSTALL_DIR"
+            echo "Servidor NAS EAD-COL (Debian 13)"
+            echo "Versión: $(git log -1 --format='%h (%cd)' --date=short)"
+            echo "Commit:  $(git log -1 --format='%s')"
+        else
+            echo "Servidor NAS EAD-COL (Debian 13) - Versión 1.0"
+        fi
+        exit 0
+        ;;
+
+    uninstall|--uninstall)
+        if [ -f "$INSTALL_DIR/install.sh" ]; then
+            bash "$INSTALL_DIR/install.sh" --uninstall
+        else
+            rm -f /usr/local/bin/nas
+            rm -rf "$INSTALL_DIR"
+            echo "✔ CLI desinstalado."
+        fi
+        exit 0
+        ;;
+
+    help|--help|-h)
+        echo "Uso: sudo nas [COMANDO]"
+        echo ""
+        echo "Comandos disponibles:"
+        echo "  nas              Abre el Asistente Visual Interactivo (Menú Whiptail)"
+        echo "  nas update       Actualiza el software a la última versión de GitHub"
+        echo "  nas status       Muestra el estado de los servicios y discos"
+        echo "  nas version      Muestra la versión actual y el commit instalado"
+        echo "  nas uninstall    Desinstala el comando 'nas' y limpia el servidor"
+        echo "  nas help         Muestra esta ayuda"
+        exit 0
+        ;;
+
+    *)
+        if [ -f "$INSTALL_DIR/asistente_nas.sh" ]; then
+            export TERM="${TERM:-xterm-256color}"
+            if [ ! -t 0 ]; then
+                exec < /dev/tty 2>/dev/null || true
+            fi
+            exec bash "$INSTALL_DIR/asistente_nas.sh" "$@"
+        else
+            echo "[-] Error: No se encontró $INSTALL_DIR/asistente_nas.sh"
+            exit 1
+        fi
+        ;;
+esac
+EOF
+
+chmod 755 "$BIN_PATH"
+ln -sf "$BIN_PATH" /usr/local/bin/asistente_nas 2>/dev/null || true
+ln -sf "$BIN_PATH" /usr/local/bin/asistente-nas 2>/dev/null || true
+
+echo -e " ${C_BOLD}[4/4]${C_RESET} ¡Instalación y configuración completadas con éxito!"
+echo ""
+echo -e "${C_GREEN}==============================================================================${C_RESET}"
+echo -e "${C_BOLD}${C_WHITE} ✔ ¡EL CLI 'nas' ESTÁ LISTO PARA USAR EN TU SERVIDOR!${C_RESET}"
+echo -e "${C_GREEN}==============================================================================${C_RESET}"
+echo -e " • Para abrir el asistente en cualquier momento:  ${C_CYAN}sudo nas${C_RESET}"
+echo -e " • Para actualizar a la última versión:          ${C_CYAN}sudo nas update${C_RESET}"
+echo -e " • Para desinstalar por completo:                ${C_CYAN}sudo nas uninstall${C_RESET}"
+echo -e "${C_GREEN}==============================================================================${C_RESET}\n"
+
+# Si se ejecuta interactivamente, preguntar si desea iniciar de inmediato
+if [ -t 0 ]; then
+    read -r -p "¿Deseas abrir el Asistente Visual ahora mismo? [S/n]: " RESP
+    RESP=${RESP:-S}
+    if [[ "$RESP" =~ ^[sSyY]$ ]]; then
+        exec "$BIN_PATH"
+    fi
+fi

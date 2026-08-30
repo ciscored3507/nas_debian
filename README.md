@@ -2,11 +2,32 @@
 
 Este repositorio contiene la suite de scripts interactivos y automatizados para desplegar y administrar servidores de almacenamiento en red (**NAS Departamental**) y **Centrales de Copias de Seguridad** inmunes a ransomware bajo **Debian 13 (Trixie)**.
 
+## ⚡ Instalación Rápida en 1 Línea (One-Liner Remoto)
+
+Puedes instalar y desplegar todo el entorno en cualquier servidor Debian 13 ejecutando una sola línea en tu terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ciscored3507/nas_debian/main/install.sh | sudo bash
+```
+*(o si dispones de `wget`: `wget -qO- https://raw.githubusercontent.com/ciscored3507/nas_debian/main/install.sh | sudo bash`)*
+
+### 🎮 Comandos Globales del CLI `nas`:
+
+Una vez instalado, el comando **`nas`** queda registrado en el sistema para uso local y offline:
+
+| Comando | Acción |
+| :--- | :--- |
+| `sudo nas` | Abre el **Asistente Visual Interactivo** con todos sus módulos. |
+| `sudo nas update` | Actualiza el proyecto a la última versión de GitHub en 1 segundo. |
+| `sudo nas status` | Diagnóstico rápido en tiempo real de Samba, Cockpit, UFW y discos. |
+| `sudo nas version` | Muestra la versión actual y el último commit instalado. |
+| `sudo nas uninstall` | Desinstala el comando `nas` y limpia el servidor por completo. |
+
 ---
 
-## 📋 Guía de Puesta a Punto del Servidor (Paso a Paso)
+## 📋 Guía de Puesta a Punto Manual del Servidor (Paso a Paso)
 
-Sigue estos pasos antes de ejecutar el asistente para garantizar que el sistema operativo base esté actualizado, seguro y con todas las dependencias necesarias.
+Si prefieres preparar el servidor manualmente paso a paso antes de lanzar el asistente:
 
 ---
 

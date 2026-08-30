@@ -30,7 +30,8 @@ Todos los archivos del proyecto son portables y se adaptan dinámicamente al dir
 
 | Archivo / Ruta | Tipo | Descripción |
 | :--- | :--- | :--- |
-| `asistente_nas.sh` | Script Bash (TUI `whiptail`) | **Asistente Visual Interactivo** con colores nativos, detección dinámica de discos/IP/usuario, validación en vivo, ciclo de edición y 8 módulos de gestión. |
+| `install.sh` | Script Bash CLI | **Instalador Remoto Oficial y Gestor CLI** para desplegar el comando `nas`, con auto-actualización (`update`) y desinstalación limpia. |
+| `asistente_nas.sh` | Script Bash (TUI `whiptail`) | **Asistente Visual Interactivo** con colores nativos, detección dinámica de discos/IP/usuario, validación en vivo, ciclo de edición y 9 módulos de gestión. |
 | `ejecutar_configuracion_ead.sh` | Script Bash CLI | **Motor de Despliegue Automatizado** con detección inteligente de entorno, protección de partición raíz, soporte de roles (`ARCHIVOS` o `BACKUP`), formateo, Samba, Cockpit y parches. |
 | `desinstalar_nas_ead.sh` | Script Bash CLI | **Desinstalador y Limpiador Total** para restablecer el servidor a su estado base limpio. |
 | `configurar_nas.sh` | Script Bash CLI | **Configuración Rápida Alternativa** para entornos simplificados. |

@@ -1485,12 +1485,49 @@ desinstalar_guiado() {
 }
 
 # ==============================================================================
+# 8. FUNCIÓN: AUTO-ACTUALIZACIÓN DESDE GITHUB
+# ==============================================================================
+actualizar_desde_git() {
+    clear
+    echo -e "${C_CYAN}"
+    echo "  ╭──────────────────────────────────────────────────────────────────────────╮"
+    echo "  │             BUSCANDO ACTUALIZACIONES DEL PROYECTO EN GITHUB              │"
+    echo "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+
+    if [ -d "$SCRIPT_DIR/.git" ]; then
+        cd "$SCRIPT_DIR"
+        echo -e " [•] Conectando con GitHub..."
+        git fetch origin main 2>/dev/null || true
+        CURRENT_REV=$(git rev-parse HEAD 2>/dev/null || echo "1")
+        REMOTE_REV=$(git rev-parse origin/main 2>/dev/null || echo "2")
+
+        if [ "$CURRENT_REV" == "$REMOTE_REV" ]; then
+            whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+                --msgbox "✔ Tu versión ya está completamente actualizada a la última versión de GitHub.\n\nCommit: $(git log -1 --format='%h - %s (%cd)' --date=short)" 10 70
+        else
+            if (whiptail --title "Actualización Disponible" \
+                --yes-button "< Actualizar Ahora >" --no-button "< Cancelar >" \
+                --yesno "Hay una nueva versión disponible en GitHub:\n\n$(git log HEAD..origin/main --oneline -n 5)\n\n¿Deseas descargar e instalar la actualización ahora?" 15 72); then
+                git reset --hard origin/main
+                chmod +x "$SCRIPT_DIR"/*.sh
+                whiptail --title "$APP_TITLE" --ok-button "< Reiniciar Asistente >" \
+                    --msgbox "✔ ¡Actualización instalada con éxito!\n\nEl asistente se reiniciará con las nuevas mejoras." 9 65
+                exec bash "$SCRIPT_DIR/asistente_nas.sh"
+            fi
+        fi
+    else
+        whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
+            --msgbox "Para actualizar ejecuta:\nsudo nas update" 9 55
+    fi
+}
+
+# ==============================================================================
 # MENÚ PRINCIPAL INTERACTIVO
 # ==============================================================================
 while true; do
     OPCION=$(whiptail --title "$APP_TITLE" \
         --ok-button "< Seleccionar >" --cancel-button "< Salir >" \
-        --menu "Selecciona una opción usando las flechas y presiona Enter:" 20 74 8 \
+        --menu "Selecciona una opción usando las flechas y presiona Enter:" 21 74 9 \
         "1" "[1]  Desplegar Servidor (NAS de Archivos o Central de Backup)" \
         "2" "[2]  Gestión de Grupos de Seguridad (Crear / Listar / Eliminar)" \
         "3" "[3]  Gestión de Recursos Compartidos (Ver / Crear / Deshabilitar / Borrar)" \
@@ -1498,7 +1535,8 @@ while true; do
         "5" "[5]  Gestión de Usuarios y Empleados (Crear, Grupos y Claves)" \
         "6" "[6]  Ver Diagnóstico, Discos y Recursos Compartidos" \
         "7" "[7]  Reiniciar Servicios de Red (Samba / Cockpit)" \
-        "8" "[8]  Desinstalar y Limpiar Servidor" 3>&1 1>&2 2>&3)
+        "8" "[8]  Buscar Actualizaciones desde GitHub (Auto-Update)" \
+        "9" "[9]  Desinstalar y Limpiar Servidor" 3>&1 1>&2 2>&3)
 
     if [ $? -ne 0 ]; then
         clear
@@ -1521,6 +1559,7 @@ while true; do
                     --msgbox "✔ Servicios de Samba, WSDD2 y Cockpit reiniciados correctamente." 8 60
             fi
             ;;
-        8) desinstalar_guiado ;;
+        8) actualizar_desde_git ;;
+        9) desinstalar_guiado ;;
     esac
 done
