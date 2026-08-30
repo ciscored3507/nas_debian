@@ -1,0 +1,321 @@
+#!/usr/bin/env python3
+import sys, os, glob, json, subprocess, re
+from datetime import datetime
+
+CRED_DIR = "/etc/backup-credentials"
+BIN_DIR = "/usr/local/bin"
+CRON_DIR = "/etc/cron.d"
+BKP_ROOT = "/srv/nas/BACKUPS_HISTORICOS"
+LOG_ROOT = "/srv/nas/LOGS_BACKUP"
+
+def ensure_dirs():
+    os.makedirs(CRED_DIR, exist_ok=True)
+    os.makedirs(BKP_ROOT, exist_ok=True)
+    os.makedirs(LOG_ROOT, exist_ok=True)
+
+def list_tasks():
+    ensure_dirs()
+    tasks = []
+    runners = sorted(glob.glob(f"{BIN_DIR}/backup_*.sh"))
+    
+    for r in runners:
+        tname = os.path.basename(r).replace("backup_", "").replace(".sh", "")
+        proto = "Local"
+        src = "N/A"
+        ret = 30
+        
+        try:
+            with open(r, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+                if "cifs" in content:
+                    proto = "Windows (CIFS)"
+                    m_ip = re.search(r'SRC_IP="([^"]+)"', content)
+                    m_sh = re.search(r'SRC_SHARE="([^"]+)"', content)
+                    if m_ip and m_sh:
+                        src = f"//{m_ip.group(1)}/{m_sh.group(1)}"
+                elif "sshpass" in content or "ssh -p" in content:
+                    proto = "Linux (SSH)"
+                    m_ip = re.search(r'SRC_IP="([^"]+)"', content)
+                    m_pt = re.search(r'SRC_PATH="([^"]+)"', content)
+                    m_us = re.search(r'SRC_USER="([^"]+)"', content)
+                    if m_ip and m_pt:
+                        src = f"{m_us.group(1)}@{m_ip.group(1)}:{m_pt.group(1)}"
+                else:
+                    proto = "Local"
+                    m_pt = re.search(r'SRC_PATH="([^"]+)"', content)
+                    if m_pt: src = m_pt.group(1)
+                
+                m_ret = re.search(r'RETENTION=(\d+)', content)
+                if m_ret: ret = int(m_ret.group(1))
+        except Exception as e:
+            continue
+
+        cron_file = f"{CRON_DIR}/backup_{tname}"
+        cron_sched = "Manual"
+        if os.path.exists(cron_file):
+            try:
+                with open(cron_file, "r") as cf:
+                    parts = cf.read().strip().split()
+                    if len(parts) >= 5:
+                        cron_sched = " ".join(parts[:5])
+            except:
+                pass
+
+        log_file = f"{LOG_ROOT}/backup_{tname}.log"
+        last_run = "Nunca"
+        last_status = "Pendiente"
+        if os.path.exists(log_file):
+            try:
+                mtime = os.path.getmtime(log_file)
+                last_run = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                with open(log_file, "r", encoding="utf-8", errors="ignore") as lf:
+                    lines = lf.readlines()[-10:]
+                    full_log = "".join(lines)
+                    if "FINALIZADO CON ÉXITO" in full_log or "FINALIZADO:" in full_log:
+                        last_status = "Éxito"
+                    elif "error" in full_log.lower() or "failed" in full_log.lower():
+                        last_status = "Fallo"
+                    else:
+                        last_status = "En progreso"
+            except:
+                pass
+
+        # Conteo de snapshots
+        snap_count = len(glob.glob(f"{BKP_ROOT}/{tname}/snapshot_*"))
+
+        tasks.append({
+            "id": tname,
+            "proto": proto,
+            "src": src,
+            "cron": cron_sched,
+            "retention": ret,
+            "last_run": last_run,
+            "last_status": last_status,
+            "snaps": snap_count
+        })
+    
+    print(json.dumps({"status": "ok", "tasks": tasks}))
+
+def test_cifs(ip, share, user, password):
+    cmd = ["smbclient", f"//{ip}/{share}", f"-U{user}%{password}", "-c", "dir"]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode == 0:
+        print(json.dumps({"status": "ok", "message": "Conexión CIFS/SMB exitosa."}))
+    else:
+        err = res.stderr or res.stdout
+        print(json.dumps({"status": "error", "message": f"Error de conexión: {err.strip()}"}))
+
+def test_ssh(ip, port, user, password):
+    cmd = ["sshpass", "-p", password, "ssh", "-p", str(port), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", f"{user}@{ip}", "echo OK"]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode == 0 and "OK" in res.stdout:
+        print(json.dumps({"status": "ok", "message": "Conexión SSH exitosa."}))
+    else:
+        err = res.stderr or res.stdout or "Tiempo de espera agotado"
+        print(json.dumps({"status": "error", "message": f"Error SSH: {err.strip()}"}))
+
+def create_task(data):
+    ensure_dirs()
+    tname = re.sub(r'[^A-Za-z0-9_-]', '_', data.get("id", ""))
+    if not tname:
+        print(json.dumps({"status": "error", "message": "Nombre de tarea inválido."}))
+        return
+
+    proto = data.get("proto", "cifs")
+    cron_expr = data.get("cron", "0 23 * * *")
+    retention = int(data.get("retention", 30))
+    runner = f"{BIN_DIR}/backup_{tname}.sh"
+    cron_file = f"{CRON_DIR}/backup_{tname}"
+    cred_file = f"{CRED_DIR}/{tname}.cred"
+
+    if proto == "cifs":
+        ip = data.get("ip", "")
+        share = data.get("share", "").replace("/", "")
+        user = data.get("user", "Administrador")
+        pwd = data.get("password", "")
+
+        with open(cred_file, "w") as f:
+            f.write(f"username={user}\npassword={pwd}\n")
+        os.chmod(cred_file, 0o600)
+
+        script = f"""#!/bin/bash
+set -e
+TASK="{tname}"
+SRC_IP="{ip}"
+SRC_SHARE="{share}"
+CRED_FILE="{cred_file}"
+MOUNT_POINT="/mnt/backup_sources/$TASK"
+BKP_DIR="{BKP_ROOT}/$TASK"
+LOG_FILE="{LOG_ROOT}/backup_${{TASK}}.log"
+RETENTION={retention}
+DATE_STR=$(date +%Y-%m-%d_%H%M%S)
+TARGET_SNAPSHOT="$BKP_DIR/snapshot_$DATE_STR"
+
+echo "=== INICIANDO BACKUP CIFS: $TASK ($DATE_STR) ===" >> "$LOG_FILE"
+mkdir -p "$MOUNT_POINT" "$BKP_DIR"
+umount "$MOUNT_POINT" 2>/dev/null || true
+
+mount -t cifs "//$SRC_IP/$SRC_SHARE" "$MOUNT_POINT" -o credentials="$CRED_FILE",ro,iocharset=utf8,vers=3.0,sec=ntlmssp 2>> "$LOG_FILE"
+
+LAST_SNAPSHOT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+LINK_DEST_OPT=""
+if [ -n "$LAST_SNAPSHOT" ] && [ -d "$LAST_SNAPSHOT" ]; then
+    LINK_DEST_OPT="--link-dest=$LAST_SNAPSHOT"
+    echo " -> Deduplicando con hardlinks contra: $(basename "$LAST_SNAPSHOT")" >> "$LOG_FILE"
+fi
+
+rsync -a --delete $LINK_DEST_OPT "$MOUNT_POINT/" "$TARGET_SNAPSHOT/" >> "$LOG_FILE" 2>&1
+umount "$MOUNT_POINT" 2>/dev/null || true
+
+SNAPSHOT_COUNT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | wc -l)
+if [ "$SNAPSHOT_COUNT" -gt "$RETENTION" ]; then
+    OLDEST=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | tail -n +$(($RETENTION + 1)))
+    for old in $OLDEST; do
+        echo " -> Rotando snapshot antiguo: $(basename "$old")" >> "$LOG_FILE"
+        rm -rf "$old"
+    done
+fi
+
+echo "=== BACKUP FINALIZADO CON ÉXITO: $DATE_STR ===" >> "$LOG_FILE"
+"""
+    elif proto == "ssh":
+        ip = data.get("ip", "")
+        port = data.get("port", 22)
+        rpath = data.get("path", "/var/www")
+        user = data.get("user", "root")
+        pwd = data.get("password", "")
+
+        with open(cred_file, "w") as f:
+            f.write(pwd)
+        os.chmod(cred_file, 0o600)
+
+        script = f"""#!/bin/bash
+set -e
+TASK="{tname}"
+SRC_IP="{ip}"
+SRC_PORT="{port}"
+SRC_PATH="{rpath}"
+SRC_USER="{user}"
+CRED_FILE="{cred_file}"
+BKP_DIR="{BKP_ROOT}/$TASK"
+LOG_FILE="{LOG_ROOT}/backup_${{TASK}}.log"
+RETENTION={retention}
+DATE_STR=$(date +%Y-%m-%d_%H%M%S)
+TARGET_SNAPSHOT="$BKP_DIR/snapshot_$DATE_STR"
+
+echo "=== INICIANDO BACKUP SSH: $TASK ($DATE_STR) ===" >> "$LOG_FILE"
+mkdir -p "$BKP_DIR"
+
+LAST_SNAPSHOT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+LINK_DEST_OPT=""
+if [ -n "$LAST_SNAPSHOT" ] && [ -d "$LAST_SNAPSHOT" ]; then
+    LINK_DEST_OPT="--link-dest=$LAST_SNAPSHOT"
+    echo " -> Deduplicando con hardlinks contra: $(basename "$LAST_SNAPSHOT")" >> "$LOG_FILE"
+fi
+
+PASS=$(cat "$CRED_FILE")
+sshpass -p "$PASS" rsync -avz -e "ssh -p $SRC_PORT -o StrictHostKeyChecking=no" --delete $LINK_DEST_OPT "$SRC_USER@$SRC_IP:$SRC_PATH/" "$TARGET_SNAPSHOT/" >> "$LOG_FILE" 2>&1
+
+SNAPSHOT_COUNT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | wc -l)
+if [ "$SNAPSHOT_COUNT" -gt "$RETENTION" ]; then
+    OLDEST=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | tail -n +$(($RETENTION + 1)))
+    for old in $OLDEST; do
+        echo " -> Rotando snapshot antiguo: $(basename "$old")" >> "$LOG_FILE"
+        rm -rf "$old"
+    done
+fi
+
+echo "=== BACKUP FINALIZADO CON ÉXITO: $DATE_STR ===" >> "$LOG_FILE"
+"""
+    else:
+        lpath = data.get("path", "/srv/nas/SISTEMAS")
+        script = f"""#!/bin/bash
+set -e
+TASK="{tname}"
+SRC_PATH="{lpath}"
+BKP_DIR="{BKP_ROOT}/$TASK"
+LOG_FILE="{LOG_ROOT}/backup_${{TASK}}.log"
+RETENTION={retention}
+DATE_STR=$(date +%Y-%m-%d_%H%M%S)
+TARGET_SNAPSHOT="$BKP_DIR/snapshot_$DATE_STR"
+
+echo "=== INICIANDO BACKUP LOCAL: $TASK ($DATE_STR) ===" >> "$LOG_FILE"
+mkdir -p "$BKP_DIR"
+
+LAST_SNAPSHOT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | head -n 1 || echo "")
+LINK_DEST_OPT=""
+if [ -n "$LAST_SNAPSHOT" ] && [ -d "$LAST_SNAPSHOT" ]; then
+    LINK_DEST_OPT="--link-dest=$LAST_SNAPSHOT"
+    echo " -> Deduplicando con hardlinks contra: $(basename "$LAST_SNAPSHOT")" >> "$LOG_FILE"
+fi
+
+rsync -a --delete $LINK_DEST_OPT "$SRC_PATH/" "$TARGET_SNAPSHOT/" >> "$LOG_FILE" 2>&1
+
+SNAPSHOT_COUNT=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | wc -l)
+if [ "$SNAPSHOT_COUNT" -gt "$RETENTION" ]; then
+    OLDEST=$(ls -td "$BKP_DIR"/snapshot_* 2>/dev/null | tail -n +$(($RETENTION + 1)))
+    for old in $OLDEST; do
+        echo " -> Rotando snapshot antiguo: $(basename "$old")" >> "$LOG_FILE"
+        rm -rf "$old"
+    done
+fi
+
+echo "=== BACKUP FINALIZADO CON ÉXITO: $DATE_STR ===" >> "$LOG_FILE"
+"""
+
+    with open(runner, "w") as f:
+        f.write(script)
+    os.chmod(runner, 0o750)
+
+    with open(cron_file, "w") as f:
+        f.write(f"{cron_expr} root {runner} >/dev/null 2>&1\n")
+    os.chmod(cron_file, 0o644)
+
+    print(json.dumps({"status": "ok", "message": f"Tarea '{tname}' programada exitosamente."}))
+
+def delete_task(tname):
+    tname = re.sub(r'[^A-Za-z0-9_-]', '', tname)
+    runner = f"{BIN_DIR}/backup_{tname}.sh"
+    cron_file = f"{CRON_DIR}/backup_{tname}"
+    cred_file = f"{CRED_DIR}/{tname}.cred"
+
+    if os.path.exists(runner): os.remove(runner)
+    if os.path.exists(cron_file): os.remove(cron_file)
+    if os.path.exists(cred_file): os.remove(cred_file)
+
+    print(json.dumps({"status": "ok", "message": f"Tarea '{tname}' eliminada."}))
+
+def read_logs(tname):
+    tname = re.sub(r'[^A-Za-z0-9_-]', '', tname)
+    log_file = f"{LOG_ROOT}/backup_{tname}.log"
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+                content = "".join(f.readlines()[-200:])
+            print(json.dumps({"status": "ok", "logs": content}))
+        except Exception as e:
+            print(json.dumps({"status": "error", "logs": str(e)}))
+    else:
+        print(json.dumps({"status": "ok", "logs": "(No se han generado registros todavía)"}))
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        list_tasks()
+        sys.exit(0)
+
+    action = sys.argv[1]
+    if action == "list":
+        list_tasks()
+    elif action == "delete":
+        delete_task(sys.argv[2])
+    elif action == "logs":
+        read_logs(sys.argv[2])
+    elif action == "create":
+        data = json.loads(sys.argv[2])
+        create_task(data)
+    elif action == "test_cifs":
+        data = json.loads(sys.argv[2])
+        test_cifs(data.get("ip"), data.get("share"), data.get("user"), data.get("password"))
+    elif action == "test_ssh":
+        data = json.loads(sys.argv[2])
+        test_ssh(data.get("ip"), data.get("port", 22), data.get("user"), data.get("password"))

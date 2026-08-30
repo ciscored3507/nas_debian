@@ -1,0 +1,12 @@
+{
+    "version": 2.0,
+    "requires": {
+        "cockpit": "260"
+    },
+    "menu": {
+        "index": {
+            "label": "Backups (EAD)",
+            "order": 115
+        }
+    }
+}

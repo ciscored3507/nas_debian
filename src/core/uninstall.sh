@@ -33,7 +33,7 @@ systemctl daemon-reload
 echo "[4/6] Eliminando archivos de configuración y wrappers..."
 rm -rf /etc/samba
 rm -f /usr/local/sbin/chage /usr/local/sbin/passwd /usr/local/bin/lastb /usr/bin/lastb
-rm -rf /usr/share/cockpit/file-sharing /usr/share/cockpit/identities /usr/share/cockpit/navigator
+rm -rf /usr/share/cockpit/file-sharing /usr/share/cockpit/identities /usr/share/cockpit/navigator /usr/share/cockpit/backups
 
 echo "[5/6] Eliminando grupos creados..."
 for grp in $(grep -E '^grp_' /etc/group | cut -d: -f1); do

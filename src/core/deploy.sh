@@ -116,6 +116,14 @@ for js in glob.glob("/usr/share/cockpit/identities/assets/*.js"):
         pass
 ' 2>/dev/null || true
 
+# 3. Instalar Módulo Web Nativo de Backups (EAD) en Cockpit
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -d "$SRC_DIR/web/backups" ]; then
+    mkdir -p /usr/share/cockpit/backups
+    cp -rf "$SRC_DIR/web/backups/"* /usr/share/cockpit/backups/
+    chmod -R 755 /usr/share/cockpit/backups
+fi
+
 # Parche WSDD2
 echo "WSDD2_OPTS=\"-N $SMB_NETBIOS -G $SMB_WORKGROUP -H $SMB_NETBIOS\"" > /etc/default/wsdd2
 mkdir -p /etc/systemd/system/wsdd2.service.d

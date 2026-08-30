@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copias de Seguridad (EAD-COL)</title>
+    <script src="../base1/cockpit.js"></script>
+    <style>
+        :root {
+            --bg-main: #181a1f;
+            --bg-card: #22262e;
+            --bg-input: #121417;
+            --border-color: #353a45;
+            --text-main: #e6edf3;
+            --text-muted: #8b949e;
+            --accent-blue: #2f81f7;
+            --accent-green: #238636;
+            --accent-green-hover: #2ea043;
+            --accent-red: #da3633;
+            --accent-yellow: #d29922;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        h1, h2, h3 { margin-top: 0; font-weight: 600; }
+        .header-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .header-title h1 { margin: 0; font-size: 1.5rem; }
+
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 24px; gap: 8px; }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: var(--text-main); }
+        .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th {
+            background: #1c1f26;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        td {
+            padding: 14px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(35, 134, 54, 0.25); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.4); }
+        .badge-pending { background: rgba(210, 153, 34, 0.25); color: #e3b341; border: 1px solid rgba(227, 179, 65, 0.4); }
+        .badge-error { background: rgba(218, 54, 51, 0.25); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.4); }
+        .badge-proto { background: #30363d; color: #c9d1d9; }
+
+        /* Buttons */
+        .btn {
+            background: #30363d;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #3c444d; }
+        .btn-primary { background: var(--accent-green); border-color: rgba(255,255,255,0.1); }
+        .btn-primary:hover { background: var(--accent-green-hover); }
+        .btn-danger { background: rgba(218, 54, 51, 0.2); color: #f85149; border-color: rgba(248, 81, 73, 0.3); }
+        .btn-danger:hover { background: var(--accent-red); color: #fff; }
+        .btn-action { padding: 4px 10px; font-size: 0.8rem; }
+
+        /* Form */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group.full-width { grid-column: span 2; }
+        label { font-size: 0.85rem; font-weight: 500; color: var(--text-muted); }
+        input, select, textarea {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 9px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        input:focus, select:focus { border-color: var(--accent-blue); }
+
+        /* Protocol Radio Cards */
+        .proto-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+        .proto-card {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            background: var(--bg-input);
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .proto-card:hover { border-color: #58a6ff; }
+        .proto-card.selected { border-color: var(--accent-blue); background: rgba(47, 129, 247, 0.1); }
+        .proto-card h4 { margin: 0 0 6px 0; font-size: 0.95rem; }
+        .proto-card p { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
+
+        /* Modals & Alerts */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 0.88rem;
+        }
+        .alert-info { background: rgba(47, 129, 247, 0.15); border: 1px solid rgba(47, 129, 247, 0.3); color: #79c0ff; }
+        .alert-success { background: rgba(35, 134, 54, 0.15); border: 1px solid rgba(35, 134, 54, 0.3); color: #56d364; }
+        .alert-error { background: rgba(218, 54, 51, 0.15); border: 1px solid rgba(218, 54, 51, 0.3); color: #ff7b72; }
+
+        /* Log console */
+        .console {
+            background: #0d1117;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 14px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.85rem;
+            color: #7ee787;
+            height: 380px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 750px;
+            max-width: 90vw;
+            padding: 24px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-header h3 { margin: 0; }
+        .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="header-title">
+        <div>
+            <h1>🛡️ Central de Respaldos (EAD-COL)</h1>
+            <p style="margin: 4px 0 0 0; color: var(--text-muted); font-size: 0.85rem;">Motor de copias de seguridad automatizadas multiplataforma con deduplicación por enlaces duros</p>
+        </div>
+        <button class="btn" onclick="cargarTareas()">🔄 Actualizar</button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tab-tasks')">📋 Tareas Programadas</button>
+        <button class="tab-btn" onclick="switchTab('tab-new')">➕ Nueva Tarea de Backup</button>
+        <button class="tab-btn" onclick="switchTab('tab-logs')">📜 Visor de Logs</button>
+    </div>
+
+    <!-- TAB 1: Tareas Programadas -->
+    <div id="tab-tasks" class="tab-content">
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Identificador</th>
+                        <th>Protocolo</th>
+                        <th>Origen</th>
+                        <th>Horario (Cron)</th>
+                        <th>Retención</th>
+                        <th>Snapshots</th>
+                        <th>Última Ejecución</th>
+                        <th>Estado</th>
+                        <th style="text-align: right;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tasks-table-body">
+                    <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Cargando tareas de respaldo...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 2: Nueva Tarea de Backup -->
+    <div id="tab-new" class="tab-content" style="display: none;">
+        <div class="card">
+            <h3>1. Tipo de Servidor / Origen de Respaldo</h3>
+            <div class="proto-grid">
+                <div class="proto-card selected" id="card-cifs" onclick="selectProto('cifs')">
+                    <h4>🪟 Windows / SMB (CIFS)</h4>
+                    <p>Respaldo de carpetas compartidas en servidores Windows o NAS</p>
+                </div>
+                <div class="proto-card" id="card-ssh" onclick="selectProto('ssh')">
+                    <h4>🐧 Servidor Linux (SSH)</h4>
+                    <p>Respaldo remoto por túnel seguro SSH y rsync</p>
+                </div>
+                <div class="proto-card" id="card-local" onclick="selectProto('local')">
+                    <h4>💻 Carpeta Local</h4>
+                    <p>Respaldo de un directorio físico del mismo servidor</p>
+                </div>
+            </div>
+
+            <div id="alert-test" class="alert alert-info" style="display: none;"></div>
+
+            <h3>2. Datos de Configuración</h3>
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label>Identificador Único de la Tarea (sin espacios):</label>
+                    <input type="text" id="task-id" placeholder="ej. srv_ad_contabilidad">
+                </div>
+
+                <!-- Campos CIFS / SSH -->
+                <div class="form-group field-remote">
+                    <label>Dirección IP o Nombre del Servidor Remoto:</label>
+                    <input type="text" id="task-ip" placeholder="ej. 10.10.1.50">
+                </div>
+
+                <div class="form-group field-cifs">
+                    <label>Nombre del Recurso Compartido Windows:</label>
+                    <input type="text" id="task-share" placeholder="ej. Documentos o Contabilidad$">
+                </div>
+
+                <div class="form-group field-ssh" style="display: none;">
+                    <label>Puerto SSH Remoto:</label>
+                    <input type="number" id="task-port" value="22">
+                </div>
+
+                <div class="form-group field-ssh" style="display: none;">
+                    <label>Ruta Remota en Servidor Linux:</label>
+                    <input type="text" id="task-remote-path" placeholder="ej. /var/www o /srv/datos">
+                </div>
+
+                <!-- Campos Locales -->
+                <div class="form-group full-width field-local" style="display: none;">
+                    <label>Ruta Física Local a Respaldar:</label>
+                    <input type="text" id="task-local-path" value="/srv/nas/SISTEMAS">
+                </div>
+
+                <!-- Credenciales Remotas -->
+                <div class="form-group field-remote">
+                    <label>Usuario con Permisos de Lectura:</label>
+                    <input type="text" id="task-user" placeholder="ej. Administrador o root">
+                </div>
+
+                <div class="form-group field-remote">
+                    <label>Contraseña:</label>
+                    <input type="password" id="task-password" placeholder="••••••••••••">
+                </div>
+
+                <!-- Programación y Retención -->
+                <div class="form-group">
+                    <label>Frecuencia de Ejecución Automática:</label>
+                    <select id="task-cron-select" onchange="handleCronSelect(this.value)">
+                        <option value="0 23 * * *">Diario a las 23:00 hrs (Recomendado)</option>
+                        <option value="0 */6 * * *">Cada 6 Horas</option>
+                        <option value="0 */12 * * *">Cada 12 Horas</option>
+                        <option value="0 1 * * 0">Semanal (Domingos 01:00 hrs)</option>
+                        <option value="custom">Personalizado (Expresión Cron)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="group-custom-cron" style="display: none;">
+                    <label>Expresión Cron Personalizada:</label>
+                    <input type="text" id="task-cron" value="0 23 * * *">
+                </div>
+
+                <div class="form-group">
+                    <label>Retención de Snapshots Históricos (Deduplicados):</label>
+                    <input type="number" id="task-retention" value="30" min="1" max="365">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 10px;">
+                <button class="btn field-remote" id="btn-test" onclick="probarConexion()">🔍 Probar Conexión</button>
+                <button class="btn btn-primary" id="btn-save" onclick="guardarTarea()">💾 Guardar y Programar Tarea</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: Visor de Logs -->
+    <div id="tab-logs" class="tab-content" style="display: none;">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label>Seleccionar Tarea:</label>
+                    <select id="log-task-select" onchange="verLogs(this.value)" style="min-width: 220px;"></select>
+                </div>
+                <button class="btn" onclick="verLogs(document.getElementById('log-task-select').value)">🔄 Refrescar Registro</button>
+            </div>
+            <div class="console" id="log-console">Selecciona una tarea para consultar su registro de actividad en vivo...</div>
+        </div>
+    </div>
+
+    <!-- Modal de Logs -->
+    <div class="modal-overlay" id="modal-logs">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-log-title">Registro de Actividad</h3>
+                <button class="close-btn" onclick="cerrarModal()">×</button>
+            </div>
+            <div class="console" id="modal-log-console">Cargando registros...</div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+                <button class="btn" onclick="cerrarModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_PATH = "/usr/share/cockpit/backups/backup_api.py";
+        let currentProto = "cifs";
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).style.display = 'block';
+            event.target.classList.add('active');
+            if (tabId === 'tab-tasks') cargarTareas();
+        }
+
+        function selectProto(proto) {
+            currentProto = proto;
+            document.querySelectorAll('.proto-card').forEach(el => el.classList.remove('selected'));
+            document.getElementById('card-' + proto).classList.add('selected');
+
+            document.querySelectorAll('.field-cifs, .field-ssh, .field-local, .field-remote').forEach(el => el.style.display = 'none');
+
+            if (proto === 'cifs') {
+                document.querySelectorAll('.field-cifs, .field-remote').forEach(el => el.style.display = 'flex');
+            } else if (proto === 'ssh') {
+                document.querySelectorAll('.field-ssh, .field-remote').forEach(el => el.style.display = 'flex');
+            } else {
+                document.querySelectorAll('.field-local').forEach(el => el.style.display = 'flex');
+            }
+        }
+
+        function handleCronSelect(val) {
+            document.getElementById('group-custom-cron').style.display = (val === 'custom') ? 'flex' : 'none';
+        }
+
+        function runApi(args) {
+            return cockpit.spawn(["python3", API_PATH, ...args], { superuser: "try" })
+                .then(out => JSON.parse(out.trim()))
+                .catch(err => ({ status: "error", message: err.message || err }));
+        }
+
+        function cargarTareas() {
+            const tbody = document.getElementById('tasks-table-body');
+            const selectLog = document.getElementById('log-task-select');
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Cargando...</td></tr>';
+
+            runApi(["list"]).then(res => {
+                if (res.status !== "ok" || !res.tasks || res.tasks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">No hay tareas de backup programadas actualmente. Haz clic en "Nueva Tarea de Backup" para crear una.</td></tr>';
+                    selectLog.innerHTML = '<option value="">(Sin tareas)</option>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                selectLog.innerHTML = '';
+
+                res.tasks.forEach(t => {
+                    // Option for log select
+                    const opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.textContent = `${t.id} (${t.proto})`;
+                    selectLog.appendChild(opt);
+
+                    const tr = document.createElement('tr');
+                    let statusBadge = `<span class="badge badge-pending">${t.last_status}</span>`;
+                    if (t.last_status === 'Éxito') statusBadge = `<span class="badge badge-success">● Éxito</span>`;
+                    if (t.last_status === 'Fallo') statusBadge = `<span class="badge badge-error">✕ Fallo</span>`;
+
+                    tr.innerHTML = `
+                        <td><strong>${t.id}</strong></td>
+                        <td><span class="badge badge-proto">${t.proto}</span></td>
+                        <td><code style="font-size: 0.8rem; color: #a5d6ff;">${t.src}</code></td>
+                        <td><code>${t.cron}</code></td>
+                        <td>${t.retention} snaps</td>
+                        <td><strong>${t.snaps}</strong> en disco</td>
+                        <td>${t.last_run}</td>
+                        <td>${statusBadge}</td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            <button class="btn btn-action" onclick="ejecutarAhora('${t.id}')" title="Ejecutar Backup Inmediatamente">⚡ Ejecutar</button>
+                            <button class="btn btn-action" onclick="abrirModalLogs('${t.id}')" title="Ver Historial de Logs">📄 Logs</button>
+                            <button class="btn btn-action btn-danger" onclick="eliminarTarea('${t.id}')" title="Eliminar Tarea">🗑️</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function probarConexion() {
+            const alertBox = document.getElementById('alert-test');
+            alertBox.style.display = 'block';
+            alertBox.className = 'alert alert-info';
+            alertBox.textContent = '⏳ Probando conexión con el servidor remoto...';
+
+            const payload = {
+                ip: document.getElementById('task-ip').value,
+                user: document.getElementById('task-user').value,
+                password: document.getElementById('task-password').value
+            };
+
+            let action = "test_cifs";
+            if (currentProto === "cifs") {
+                payload.share = document.getElementById('task-share').value;
+            } else if (currentProto === "ssh") {
+                action = "test_ssh";
+                payload.port = document.getElementById('task-port').value;
+            }
+
+            runApi([action, JSON.stringify(payload)]).then(res => {
+                if (res.status === "ok") {
+                    alertBox.className = 'alert alert-success';
+                    alertBox.textContent = '✔ ' + res.message;
+                } else {
+                    alertBox.className = 'alert alert-error';
+                    alertBox.textContent = '✕ ' + res.message;
+                }
+            });
+        }
+
+        function guardarTarea() {
+            const tid = document.getElementById('task-id').value.trim();
+            if (!tid) { alert('Ingresa un identificador para la tarea.'); return; }
+
+            const cronSelect = document.getElementById('task-cron-select').value;
+            const cronExpr = (cronSelect === 'custom') ? document.getElementById('task-cron').value : cronSelect;
+
+            const payload = {
+                id: tid,
+                proto: currentProto,
+                cron: cronExpr,
+                retention: parseInt(document.getElementById('task-retention').value) || 30
+            };
+
+            if (currentProto === 'cifs') {
+                payload.ip = document.getElementById('task-ip').value;
+                payload.share = document.getElementById('task-share').value;
+                payload.user = document.getElementById('task-user').value;
+                payload.password = document.getElementById('task-password').value;
+            } else if (currentProto === 'ssh') {
+                payload.ip = document.getElementById('task-ip').value;
+                payload.port = document.getElementById('task-port').value;
+                payload.path = document.getElementById('task-remote-path').value;
+                payload.user = document.getElementById('task-user').value;
+                payload.password = document.getElementById('task-password').value;
+            } else {
+                payload.path = document.getElementById('task-local-path').value;
+            }
+
+            document.getElementById('btn-save').textContent = '⏳ Guardando...';
+
+            runApi(["create", JSON.stringify(payload)]).then(res => {
+                document.getElementById('btn-save').textContent = '💾 Guardar y Programar Tarea';
+                if (res.status === "ok") {
+                    alert('✔ ' + res.message);
+                    switchTab('tab-tasks');
+                } else {
+                    alert('✕ Error: ' + res.message);
+                }
+            });
+        }
+
+        function ejecutarAhora(taskId) {
+            if (!confirm(`¿Deseas iniciar la ejecución del respaldo de la tarea [${taskId}] ahora mismo en segundo plano?`)) return;
+            cockpit.spawn(["bash", `/usr/local/bin/backup_${taskId}.sh`], { superuser: "try" })
+                .then(() => {
+                    alert(`✔ Tarea [${taskId}] finalizada.`);
+                    cargarTareas();
+                })
+                .catch(err => {
+                    alert(`✕ Error al ejecutar [${taskId}]: ${err.message || err}`);
+                    cargarTareas();
+                });
+            alert(`⚡ Backup [${taskId}] iniciado en segundo plano. Puedes consultar el progreso en los logs.`);
+            cargarTareas();
+        }
+
+        function eliminarTarea(taskId) {
+            if (!confirm(`¿Estás seguro de eliminar la tarea programada [${taskId}] y sus credenciales? (Los respaldos históricos en disco se conservarán).`)) return;
+            runApi(["delete", taskId]).then(res => {
+                alert(res.message);
+                cargarTareas();
+            });
+        }
+
+        function abrirModalLogs(taskId) {
+            document.getElementById('modal-log-title').textContent = `Registro de Actividad: ${taskId}`;
+            document.getElementById('modal-logs').style.display = 'flex';
+            document.getElementById('modal-log-console').textContent = 'Cargando logs...';
+            runApi(["logs", taskId]).then(res => {
+                document.getElementById('modal-log-console').textContent = res.logs || '(Sin registros)';
+            });
+        }
+
+        function verLogs(taskId) {
+            if (!taskId) return;
+            document.getElementById('log-console').textContent = 'Cargando...';
+            runApi(["logs", taskId]).then(res => {
+                document.getElementById('log-console').textContent = res.logs || '(Sin registros)';
+            });
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal-logs').style.display = 'none';
+        }
+
+        // Carga inicial
+        cargarTareas();
+    </script>
+</body>
+</html>
