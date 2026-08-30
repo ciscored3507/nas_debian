@@ -25,6 +25,55 @@ C_RESET="\033[0m"
 
 APP_TITLE="SERVIDOR NAS & BACKUP • EAD-COL"
 
+# Directorio base del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Función para obtener la IP principal del servidor
+obtener_ip_local() {
+    local ip
+    ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}')
+    if [ -z "$ip" ]; then
+        ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    [ -z "$ip" ] && ip="127.0.0.1"
+    echo "$ip"
+}
+
+# Función para obtener usuario administrador predeterminado del sistema
+obtener_usuario_defecto() {
+    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+        echo "$SUDO_USER"
+    else
+        local u
+        u=$(awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "nobody" {print $1; exit}' /etc/passwd)
+        echo "${u:-nas}"
+    fi
+}
+
+# Obtener nombre de servidor / NetBIOS por defecto según entorno y rol
+obtener_netbios_defecto() {
+    local rol="$1"
+    local cur_host
+    cur_host=$(hostname -s 2>/dev/null | tr 'a-z' 'A-Z')
+    if [ -n "$cur_host" ] && [ "$cur_host" != "DEBIAN" ] && [ "$cur_host" != "LOCALHOST" ]; then
+        echo "$cur_host"
+    else
+        [ "$rol" == "BACKUP" ] && echo "SRV-EAD-BKP" || echo "SRV-EAD-NAS"
+    fi
+}
+
+# Obtener grupo de trabajo Samba por defecto
+obtener_workgroup_defecto() {
+    local wg=""
+    if command -v testparm &>/dev/null && [ -f /etc/samba/smb.conf ]; then
+        wg=$(testparm -s --parameter-name=workgroup 2>/dev/null || true)
+    fi
+    [ -z "$wg" ] && wg="EAD-COL"
+    echo "$wg"
+}
+
+SERVER_IP=$(obtener_ip_local)
+
 mkdir -p /etc/backup-credentials /mnt/backup_sources /srv/nas/BACKUPS_HISTORICOS /srv/nas/LOGS_BACKUP /usr/local/bin
 chmod 700 /etc/backup-credentials
 
@@ -32,6 +81,8 @@ chmod 700 /etc/backup-credentials
 # 1. FUNCIÓN: ASISTENTE DE DESPLIEGUE GUIADO (ARCHIVOS O BACKUP)
 # ==============================================================================
 instalar_nas() {
+    SERVER_IP=$(obtener_ip_local)
+
     ROL_SERVER=$(whiptail --title "Paso 1 de 5: Rol del Servidor" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --menu "Selecciona la función principal que tendrá este servidor:" 15 72 2 \
@@ -39,15 +90,121 @@ instalar_nas() {
         "BACKUP"   "Servidor de Copias de Seguridad (Central de Respaldos)" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$ROL_SERVER" ]; then return; fi
 
-    DEFAULT_NETBIOS="SRV-EAD-NAS"
-    [ "$ROL_SERVER" == "BACKUP" ] && DEFAULT_NETBIOS="SRV-EAD-BKP"
+    DEFAULT_NETBIOS=$(obtener_netbios_defecto "$ROL_SERVER")
+    DEFAULT_WORKGROUP=$(obtener_workgroup_defecto)
+    DEFAULT_USER=$(obtener_usuario_defecto)
+
+    # Detección dinámica de disco raíz (SO)
+    ROOT_DISK=""
+    ROOT_PART=$(findmnt -n -o SOURCE / 2>/dev/null || true)
+    if [ -n "$ROOT_PART" ]; then
+        R_DISK=$(lsblk -no PKNAME "$ROOT_PART" 2>/dev/null | head -n 1)
+        [ -n "$R_DISK" ] && ROOT_DISK="/dev/$R_DISK"
+    fi
+
+    # Generar opciones dinámicas para whiptail --radiolist
+    mapfile -t DISK_ITEMS < <(python3 -c '
+import subprocess, json, sys
+
+def get_mounts(dev):
+    mounts = []
+    if dev.get("mountpoint"):
+        mounts.append(dev["mountpoint"])
+    for child in dev.get("children", []):
+        mounts.extend(get_mounts(child))
+    return mounts
+
+def format_size(bytes_val):
+    for unit in ["B", "K", "M", "G", "T"]:
+        if bytes_val < 1024:
+            return f"{bytes_val:.1f} {unit}"
+        bytes_val /= 1024
+    return f"{bytes_val:.1f} P"
+
+root_disk = sys.argv[1] if len(sys.argv) > 1 else ""
+
+try:
+    out = subprocess.check_output(["lsblk", "-J", "-b", "-o", "NAME,PATH,SIZE,TYPE,MOUNTPOINT,MODEL"]).decode()
+    data = json.loads(out)
+except Exception:
+    data = {"blockdevices": []}
+
+disks = []
+has_secondary = False
+
+for dev in data.get("blockdevices", []):
+    if dev.get("type") == "disk":
+        path = dev.get("path", "/dev/" + dev.get("name", ""))
+        size_b = dev.get("size", 0)
+        size_str = format_size(size_b)
+        model = (dev.get("model") or "").strip()
+        mounts = get_mounts(dev)
+
+        is_root = (path == root_disk) or ("/" in mounts) or ("/boot" in mounts) or ("/boot/efi" in mounts)
+        is_nas = "/srv/nas" in mounts
+
+        if is_root:
+            desc = f"{size_str} [SISTEMA OPERATIVO /] (PELIGRO - NO FORMATEAR)"
+            status = "OFF"
+        elif is_nas:
+            desc = f"{size_str} [ACTUAL DATOS NAS /srv/nas]"
+            status = "ON"
+            has_secondary = True
+        elif len(mounts) == 0:
+            desc = f"{size_str} [DISCO LIBRE - RECOMENDADO] {model}".strip()
+            status = "ON" if not has_secondary else "OFF"
+            has_secondary = True
+        else:
+            m_str = ",".join(mounts)
+            desc = f"{size_str} [MONTADO: {m_str}] {model}".strip()
+            status = "OFF"
+
+        disks.append((path, desc, status))
+
+local_status = "ON" if not has_secondary else "OFF"
+disks.append(("LOCAL", "Usar particion actual (/srv/nas) sin formatear disco", local_status))
+
+on_found = False
+final_items = []
+for p, d, s in disks:
+    if s == "ON" and not on_found:
+        on_found = True
+        final_items.extend([p, d, "ON"])
+    else:
+        final_items.extend([p, d, "OFF"])
+
+if not on_found and final_items:
+    final_items[2] = "ON"
+
+for item in final_items:
+    print(item)
+' "$ROOT_DISK")
+
+    NUM_ITEMS=$((${#DISK_ITEMS[@]} / 3))
+    [ "$NUM_ITEMS" -lt 1 ] && NUM_ITEMS=1
 
     DISCO_SELECCIONADO=$(whiptail --title "Paso 2 de 5: Disco de Almacenamiento" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-        --radiolist "Selecciona el disco dedicado que contendrá los datos ($ROL_SERVER):" 15 72 3 \
-        "/dev/sdb" "Disco Secundario (Recomendado 2 TB)" ON \
-        "/dev/sda" "Disco del Sistema Operativo (NO RECOMENDADO)" OFF 3>&1 1>&2 2>&3)
+        --radiolist "Discos detectados en este servidor ($ROL_SERVER):" 18 76 $NUM_ITEMS \
+        "${DISK_ITEMS[@]}" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$DISCO_SELECCIONADO" ]; then return; fi
+
+    # Validación de seguridad si se eligió el disco que contiene el SO
+    if [ "$DISCO_SELECCIONADO" == "$ROOT_DISK" ] && [ -n "$ROOT_DISK" ]; then
+        if (whiptail --title "¡ALERTA CRÍTICA DE SEGURIDAD!" \
+            --yes-button "< Volver y Seleccionar Otro >" --no-button "< Continuar de todos modos >" \
+            --yesno "⚠ ADVERTENCIA GRAVE:\n\nEl disco seleccionado ($DISCO_SELECCIONADO) contiene el SISTEMA OPERATIVO (/).\n\nSi formateas este disco, Debian quedará DESTRUIDO e INUTILIZABLE.\n\n¿Deseas volver y seleccionar otro disco o partición local?" 15 72); then
+            return
+        else
+            CONFIRM_FORMAT=$(whiptail --title "Confirmación Extrema Requerida" \
+                --ok-button "< Confirmar >" --cancel-button "< Cancelar >" \
+                --inputbox "Para formatear el disco del sistema operativo, escribe exactamente BORRAR_TODO:" 10 65 3>&1 1>&2 2>&3)
+            if [ "$CONFIRM_FORMAT" != "BORRAR_TODO" ]; then
+                whiptail --title "Operación Cancelada" --ok-button "< Aceptar >" --msgbox "Acción cancelada por protección del sistema." 8 50
+                return
+            fi
+        fi
+    fi
 
     SMB_NETBIOS=$(whiptail --title "Paso 3 de 5: Nombre del Servidor" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
@@ -56,16 +213,15 @@ instalar_nas() {
 
     SMB_WORKGROUP=$(whiptail --title "Paso 3 de 5: Grupo de Trabajo" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-        --inputbox "Ingresa el nombre del Grupo de Trabajo (Workgroup):" 10 65 "EAD-COL" 3>&1 1>&2 2>&3)
+        --inputbox "Ingresa el nombre del Grupo de Trabajo (Workgroup):" 10 65 "$DEFAULT_WORKGROUP" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$SMB_WORKGROUP" ]; then return; fi
 
-    USUARIO_ACTUAL="${SUDO_USER:-$(logname 2>/dev/null || echo "nas")}"
-    [ "$USUARIO_ACTUAL" == "root" ] && USUARIO_ACTUAL="nas"
+    USUARIO_ACTUAL="$DEFAULT_USER"
 
     OPCION_USER=$(whiptail --title "Paso 4 de 5: Administrador de Cockpit" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --menu "Selecciona la cuenta que administrará el panel web Cockpit y el servidor:" 14 70 2 \
-        "1" "Usar usuario actual: [$USUARIO_ACTUAL] (Recomendado)" \
+        "1" "Usar usuario detectado: [$USUARIO_ACTUAL] (Recomendado)" \
         "2" "Crear o especificar otro usuario administrador" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$OPCION_USER" ]; then return; fi
 
@@ -87,7 +243,8 @@ instalar_nas() {
 
     RESUMEN="PARAMETROS DE CONFIGURACION:
 * Funcion Principal    : $ROL_SERVER
-* Disco Almacenamiento : $DISCO_SELECCIONADO (Se formateara en EXT4)
+* Direccion IP Red     : $SERVER_IP
+* Disco Almacenamiento : $DISCO_SELECCIONADO
 * Nombre del Servidor  : $SMB_NETBIOS
 * Grupo de Trabajo     : $SMB_WORKGROUP
 * Administrador Web    : $ADMIN_USER (Permisos sudo totales)
@@ -97,7 +254,7 @@ INCLUYE PARCHES AUTOMATICOS:
 - Wrappers de compatibilidad en espanol (chage / passwd / lastb)
 - Herramientas multiplataforma de Backup (CIFS, Rsync, SSHPass, Cron)
 
-¿Confirmas el formateo del disco y el despliegue completo?"
+¿Confirmas la configuracion y el despliegue completo?"
 
     if (whiptail --title "Paso 5 de 5: Confirmación Crítica" \
         --yes-button "< Sí, Iniciar Despliegue >" --no-button "< Cancelar >" \
@@ -109,10 +266,10 @@ INCLUYE PARCHES AUTOMATICOS:
         echo "  │        INICIANDO DESPLIEGUE AUTOMATIZADO DEL SERVIDOR ($ROL_SERVER)   │"
         echo "  ╰──────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
         
-        bash /home/nas/ejecutar_configuracion_ead.sh "$DISCO_SELECCIONADO" "$SMB_WORKGROUP" "$SMB_NETBIOS" "$ADMIN_USER" "$ADMIN_PASS" "$ROL_SERVER"
+        bash "$SCRIPT_DIR/ejecutar_configuracion_ead.sh" "$DISCO_SELECCIONADO" "$SMB_WORKGROUP" "$SMB_NETBIOS" "$ADMIN_USER" "$ADMIN_PASS" "$ROL_SERVER"
         
         whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
-            --msgbox "✔ ¡Despliegue completado con éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://10.10.1.2:9090\n• Usuario Cockpit: $ADMIN_USER\n• Red Windows:     \\\\10.10.1.2 (o \\\\$SMB_NETBIOS)" 13 70
+            --msgbox "✔ ¡Despliegue completado con éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://${SERVER_IP}:9090\n• Usuario Cockpit: $ADMIN_USER\n• Red Windows:     \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)" 13 70
     fi
 }
 
@@ -336,7 +493,7 @@ SMBCONF
                     testparm -s &>/dev/null
                     smbcontrol all reload-config 2>/dev/null || systemctl reload smbd
                     whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
-                        --msgbox "✔ ¡Recurso \"[$NOMBRE_SHARE]\" creado con éxito!\n\nRuta: $RUTA_SHARE\n\nAccesible desde Windows en: \\\\10.10.1.2\\$NOMBRE_SHARE" 12 70
+                        --msgbox "✔ ¡Recurso \"[$NOMBRE_SHARE]\" creado con éxito!\n\nRuta: $RUTA_SHARE\n\nAccesible desde Windows en: \\\\${SERVER_IP}\\$NOMBRE_SHARE" 12 70
                 fi
                 ;;
 
@@ -513,7 +670,7 @@ gestionar_backups() {
                 case "$PLAT_ORIGEN" in
                     1)
                         # Servidor Windows con Bucle de Reintento / Edición
-                        WIN_IP="10.10.1.4"
+                        WIN_IP=$(echo "$SERVER_IP" | awk -F. '{if(NF==4) print $1"."$2"."$3".50"; else print "192.168.1.50"}')
                         WIN_SHARE="Users"
                         WIN_USER="Administrador"
                         WIN_PASS=""
@@ -589,7 +746,7 @@ EOF_CRED
 
                     2)
                         # Servidor Linux con Bucle de Reintento / Edición
-                        LNX_IP="10.10.1.2"
+                        LNX_IP=$(echo "$SERVER_IP" | awk -F. '{if(NF==4) print $1"."$2"."$3".50"; else print "192.168.1.50"}')
                         LNX_PATH="/srv/nas"
                         LNX_USER="root"
                         LNX_PASS=""
@@ -939,7 +1096,7 @@ crear_usuario_guiado() {
         echo -e "${USER_PW}\n${USER_PW}" | smbpasswd -a -s "$USER_NAME"
 
         whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
-            --msgbox "✔ ¡Usuario Registrado con Éxito!\n\n• Usuario:  $USER_NAME\n• Perfil:   $ROL\n• Campaña:  ${CAMPANA:-Global}\n• Grupos:   $GRUPO_FINAL\n\nYa puede acceder desde la red a: \\\\10.10.1.2" 14 65
+            --msgbox "✔ ¡Usuario Registrado con Éxito!\n\n• Usuario:  $USER_NAME\n• Perfil:   $ROL\n• Campaña:  ${CAMPANA:-Global}\n• Grupos:   $GRUPO_FINAL\n\nYa puede acceder desde la red a: \\\\${SERVER_IP}" 14 65
     fi
 }
 
@@ -947,10 +1104,11 @@ crear_usuario_guiado() {
 # 6. FUNCIÓN: DIAGNÓSTICO Y ESTADO
 # ==============================================================================
 diagnostico_nas() {
+    SERVER_IP=$(obtener_ip_local)
     clear
     echo -e "${C_CYAN}"
     echo "  ╭──────────────────────────────────────────────────────────────────────────╮"
-    echo "  │               DIAGNÓSTICO EN VIVO • SERVIDOR EAD-COL                     │"
+    echo "  │               DIAGNÓSTICO EN VIVO • SERVIDOR ($SERVER_IP)                │"
     echo "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
 
     echo -e "  ${C_BOLD}${C_WHITE}1. ESTADO DE SERVICIOS EN TIEMPO REAL:${C_RESET}"
@@ -989,7 +1147,7 @@ desinstalar_guiado() {
         --yes-button "< Sí, Desinstalar Todo >" --no-button "< Cancelar >" \
         --yesno "¡CUIDADO! Esta acción desinstalará todos los paquetes de Samba, Cockpit, desmontará el disco y limpiará las configuraciones.\n\n¿Confirmas que deseas restablecer el servidor a su estado base limpio?" 12 72); then
         clear
-        bash /home/nas/desinstalar_nas_ead.sh
+        bash "$SCRIPT_DIR/desinstalar_nas_ead.sh"
         whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
             --msgbox "✔ El servidor ha sido desinstalado y el sistema quedó completamente limpio." 8 65
     fi

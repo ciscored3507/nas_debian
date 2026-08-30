@@ -42,39 +42,30 @@ Esta guía documenta el procedimiento completo, probado y 100% replicable para d
 
 ### Método 1: Asistente Gráfico Interactivo en Terminal (Recomendado)
 ```bash
-sudo bash /home/nas/asistente_nas.sh
+sudo bash asistente_nas.sh
 ```
-* **Opciones del Menú Principal:**
-  * `[1] Desplegar Servidor`: Asistente en 5 pasos que permite elegir entre **Servidor de Archivos** o **Central de Backup**, disco, nombre de red y administrador de Cockpit.
-  * `[2] Gestión de Grupos de Seguridad`: Crear, listar y eliminar grupos de red (`grp_*` y `grp_backups`).
-  * `[3] Gestión de Recursos Compartidos`: Submenú para listar, crear, deshabilitar (`available = no`) o eliminar carpetas en red Samba.
-  * `[4] Gestión de Tareas de Backup (Windows / Linux / Local)`:
-    * 📋 *Listar tareas programadas* con origen, destino y horario cron.
-    * ➕ *Crear nueva tarea automatizada* para Servidores Windows (CIFS con clave), Servidores Linux (SSH) o Carpetas Locales, con **test de conexión en vivo y ciclo de reintento/edición inmediata** en caso de error en IP, recurso o clave.
-    * ▶ *Ejecutar tarea manualmente en caliente* con visualización de logs en tiempo real.
-    * 🗑 *Eliminar tarea programada* y limpiar credenciales.
-  * `[5] Gestión de Usuarios / Empleados`: Crear cuentas con roles departamentales o cuenta técnica de backup.
-  * `[6] Ver Diagnóstico, Discos y Recursos`: Estado de servicios, almacenamiento y tareas cron activas.
-  * `[7] Reiniciar Servicios de Red`: Reinicio limpio de Samba, WSDD2 y Cockpit.
-  * `[8] Desinstalar y Limpiar Servidor`: Restablecimiento completo del equipo.
+* **Detección Automática del Entorno:**
+  * Escanea dinámicamente los discos del servidor, identifica el disco del sistema operativo (`/`) para protegerlo contra formateo accidental, y sugiere discos secundarios libres o partición local.
+  * Detecta la dirección IP real del servidor en la red local para paneles web y accesos SMB.
+  * Detecta el usuario administrador actual para asignarle permisos en Cockpit y Samba.
 
 ---
 
 ### Método 2: Despliegue Automatizado por Línea de Comandos
 ```bash
-# Sintaxis:
-sudo bash /home/nas/ejecutar_configuracion_ead.sh [DISCO] [WORKGROUP] [NETBIOS] [ADMIN_USER] [ADMIN_PASS] [ROL]
+# Sintaxis (los parámetros son opcionales con auto-detección):
+sudo bash ejecutar_configuracion_ead.sh [DISCO/LOCAL] [WORKGROUP] [NETBIOS] [ADMIN_USER] [ADMIN_PASS] [ROL]
 
 # Ejemplo para Servidor NAS de Archivos:
-sudo bash /home/nas/ejecutar_configuracion_ead.sh /dev/sdb EAD-COL SRV-EAD-NAS nas DE0puFvp85# ARCHIVOS
+sudo bash ejecutar_configuracion_ead.sh LOCAL EAD-COL SRV-EAD-NAS admin DE0puFvp85# ARCHIVOS
 
-# Ejemplo para Servidor de Backup:
-sudo bash /home/nas/ejecutar_configuracion_ead.sh /dev/sdb EAD-COL SRV-EAD-BKP nas DE0puFvp85# BACKUP
+# Ejemplo para Servidor de Backup con disco secundario:
+sudo bash ejecutar_configuracion_ead.sh /dev/sda EAD-COL SRV-EAD-BKP admin DE0puFvp85# BACKUP
 ```
 
 ### Método 3: Desinstalación y Limpieza Rápida
 ```bash
-sudo bash /home/nas/desinstalar_nas_ead.sh
+sudo bash desinstalar_nas_ead.sh
 ```
 
 ---
@@ -98,9 +89,6 @@ Para restaurar archivos o carpetas de cualquier fecha histórica:
 
 ---
 
-
----
-
 ## 4. Diferencias de Arquitectura: Servidor NAS vs Servidor de Backup
 
 ### Rol ARCHIVOS (NAS Departamental):
@@ -113,9 +101,9 @@ Para restaurar archivos o carpetas de cualquier fecha histórica:
   * `[BACKUPS_WINDOWS$]`: Destino oculto para agentes Windows (Veeam / Windows Backup).
   * `[BACKUPS_LINUX$]`: Destino oculto para servidores Linux.
   * `[BACKUPS_SERVIDORES$]`: Repositorio de imágenes y snapshots.
-* **Acceso Estricto:** Solo accesible por credenciales de `@grp_sistemas` y `@grp_backups` escribiendo la ruta UNC directa (ej. `\\10.10.1.2\BACKUPS_WINDOWS$`).
+* **Acceso Estricto:** Solo accesible por credenciales de `@grp_sistemas` y `@grp_backups` escribiendo la ruta UNC directa (ej. `\\<IP_SERVIDOR>\BACKUPS_WINDOWS$`).
 
 ## 5. Acceso Web y Conexión de Red
 
-* **Panel Web Cockpit:** `https://10.10.1.2:9090`
-* **Red Windows:** `\\10.10.1.2` (o `\\SRV-EAD-NAS` / `\\SRV-EAD-BKP`)
+* **Panel Web Cockpit:** `https://<IP_DEL_SERVIDOR>:9090`
+* **Red Windows:** `\\<IP_DEL_SERVIDOR>` (o `\\<NOMBRE_NETBIOS>`)

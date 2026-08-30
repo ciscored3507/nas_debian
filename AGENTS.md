@@ -20,15 +20,17 @@ Este documento contiene la **especificación técnica completa, inventario de sc
 
 ## 2. Inventario de Archivos del Proyecto
 
-Todos los archivos del proyecto residen en el directorio principal `/home/nas/`:
+Todos los archivos del proyecto son portables y se adaptan dinámicamente al directorio donde se alojen y al hardware del servidor:
 
 | Archivo / Ruta | Tipo | Descripción |
 | :--- | :--- | :--- |
-| `/home/nas/asistente_nas.sh` | Script Bash (TUI `whiptail`) | **Asistente Visual Interactivo** con colores nativos, validación en vivo, ciclo de edición y 8 módulos de gestión. |
-| `/home/nas/ejecutar_configuracion_ead.sh` | Script Bash CLI | **Motor de Despliegue Automatizado** parametrizado con soporte de roles (`ARCHIVOS` o `BACKUP`), formateo, Samba, Cockpit y parches. |
-| `/home/nas/desinstalar_nas_ead.sh` | Script Bash CLI | **Desinstalador y Limpiador Total** para restablecer el servidor a su estado base limpio. |
-| `/home/nas/SMB_DEBIAN.md` | Markdown | **Manual Técnico y Guía de Replicación** para usuarios y administradores. |
-| `/home/nas/AGENTS.md` | Markdown | **Este documento maestro de contexto para agentes de IA**. |
+| `asistente_nas.sh` | Script Bash (TUI `whiptail`) | **Asistente Visual Interactivo** con colores nativos, detección dinámica de discos/IP/usuario, validación en vivo, ciclo de edición y 8 módulos de gestión. |
+| `ejecutar_configuracion_ead.sh` | Script Bash CLI | **Motor de Despliegue Automatizado** con detección inteligente de entorno, protección de partición raíz, soporte de roles (`ARCHIVOS` o `BACKUP`), formateo, Samba, Cockpit y parches. |
+| `desinstalar_nas_ead.sh` | Script Bash CLI | **Desinstalador y Limpiador Total** para restablecer el servidor a su estado base limpio. |
+| `configurar_nas.sh` | Script Bash CLI | **Configuración Rápida Alternativa** para entornos simplificados. |
+| `README.md` | Markdown | **Guía de Puesta a Punto Paso a Paso** para preparación y hardening de Debian 13. |
+| `SMB_DEBIAN.md` | Markdown | **Manual Técnico y Guía de Replicación** para usuarios y administradores. |
+| `AGENTS.md` | Markdown | **Este documento maestro de contexto para agentes de IA**. |
 
 ---
 
@@ -113,21 +115,21 @@ Si se reinstala el servidor desde cero o en otra máquina, estos parches están 
 
 ### Lanzar el Asistente Interactivo:
 ```bash
-sudo bash /home/nas/asistente_nas.sh
+sudo bash asistente_nas.sh
 ```
 
 ### Despliegue Manual por Consola:
 ```bash
-# Servidor NAS:
-sudo bash /home/nas/ejecutar_configuracion_ead.sh /dev/sdb EAD-COL SRV-EAD-NAS nas DE0puFvp85# ARCHIVOS
+# Servidor NAS (usando partición local o disco dedicado):
+sudo bash ejecutar_configuracion_ead.sh LOCAL EAD-COL SRV-EAD-NAS admin DE0puFvp85# ARCHIVOS
 
-# Servidor de Backup:
-sudo bash /home/nas/ejecutar_configuracion_ead.sh /dev/sdb EAD-COL SRV-EAD-BKP nas DE0puFvp85# BACKUP
+# Servidor de Backup con disco secundario (/dev/sdb o /dev/sda según escaneo):
+sudo bash ejecutar_configuracion_ead.sh /dev/sda EAD-COL SRV-EAD-BKP admin DE0puFvp85# BACKUP
 ```
 
 ### Limpieza y Desinstalación Total:
 ```bash
-sudo bash /home/nas/desinstalar_nas_ead.sh
+sudo bash desinstalar_nas_ead.sh
 ```
 
 ### Verificar Tareas y Logs de Backup:

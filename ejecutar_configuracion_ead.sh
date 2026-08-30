@@ -11,19 +11,54 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-TARGET_DISK="${1:-/dev/sdb}"
-SMB_WORKGROUP="${2:-EAD-COL}"
-SMB_NETBIOS="${3:-SRV-EAD-NAS}"
-ADMIN_USER="${4:-nas}"
-ADMIN_PASS="${5:-}"
+# Detección automática del entorno del servidor
+SERVER_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}')
+[ -z "$SERVER_IP" ] && SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$SERVER_IP" ] && SERVER_IP="127.0.0.1"
+
+# Detección del usuario administrador por defecto
+detect_default_user() {
+    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+        echo "$SUDO_USER"
+    else
+        local u
+        u=$(awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "nobody" {print $1; exit}' /etc/passwd)
+        echo "${u:-nas}"
+    fi
+}
+
 SERVER_ROLE="${6:-ARCHIVOS}" # ARCHIVOS o BACKUP
+TARGET_DISK="${1:-LOCAL}"
+SMB_WORKGROUP="${2:-EAD-COL}"
+
+# Detección dinámica de NetBIOS si no se especificó
+if [ -n "$3" ]; then
+    SMB_NETBIOS="$3"
+else
+    CUR_HOST=$(hostname -s 2>/dev/null | tr 'a-z' 'A-Z')
+    if [ -n "$CUR_HOST" ] && [ "$CUR_HOST" != "DEBIAN" ] && [ "$CUR_HOST" != "LOCALHOST" ]; then
+        SMB_NETBIOS="$CUR_HOST"
+    else
+        [ "$SERVER_ROLE" == "BACKUP" ] && SMB_NETBIOS="SRV-EAD-BKP" || SMB_NETBIOS="SRV-EAD-NAS"
+    fi
+fi
+
+# Detección del usuario admin
+if [ -n "$4" ]; then
+    ADMIN_USER="$4"
+else
+    ADMIN_USER=$(detect_default_user)
+fi
+
+ADMIN_PASS="${5:-}"
 HOST_NAME_LOWER=$(echo "$SMB_NETBIOS" | tr 'A-Z' 'a-z')
 
 echo "=============================================================================="
 echo " CONFIGURACIÓN DE DESPLIEGUE: SERVIDOR EAD-COL ($SERVER_ROLE)"
 echo "=============================================================================="
 echo " • Rol del Servidor        : $SERVER_ROLE"
-echo " • Disco de Almacenamiento : $TARGET_DISK"
+echo " • Dirección IP del Servidor: $SERVER_IP"
+echo " • Almacenamiento          : $TARGET_DISK"
 echo " • Grupo de Trabajo        : $SMB_WORKGROUP"
 echo " • Nombre NetBIOS / Host   : $SMB_NETBIOS ($HOST_NAME_LOWER)"
 echo " • Administrador Cockpit   : $ADMIN_USER"
@@ -40,8 +75,19 @@ deb http://deb.debian.org/debian/ trixie-updates main contrib non-free non-free-
 SOURCES
 apt-get update
 
-echo " [2/9] Preparando disco de almacenamiento ($TARGET_DISK)..."
-if [ -b "$TARGET_DISK" ]; then
+echo " [2/9] Preparando almacenamiento en /srv/nas..."
+ROOT_PART=$(findmnt -n -o SOURCE / 2>/dev/null || true)
+ROOT_DISK=$(lsblk -no PKNAME "$ROOT_PART" 2>/dev/null | head -n 1 || true)
+
+if [ "$TARGET_DISK" == "LOCAL" ] || [ "$TARGET_DISK" == "local" ] || [ "$TARGET_DISK" == "none" ]; then
+    echo " [i] Modo de almacenamiento local: Usando directorio /srv/nas en partición existente."
+    mkdir -p /srv/nas
+elif [ -n "$ROOT_DISK" ] && [ "$TARGET_DISK" == "/dev/$ROOT_DISK" ]; then
+    echo " [!] ADVERTENCIA: $TARGET_DISK contiene el Sistema Operativo raíz (/)."
+    echo "     Se preserva el disco y se utiliza /srv/nas localmente para evitar pérdida del SO."
+    mkdir -p /srv/nas
+elif [ -b "$TARGET_DISK" ]; then
+    echo " [i] Formateando disco secundario dedicado: $TARGET_DISK"
     umount ${TARGET_DISK}* 2>/dev/null || true
 
     parted "$TARGET_DISK" --script mklabel gpt
@@ -64,7 +110,7 @@ if [ -b "$TARGET_DISK" ]; then
     systemctl daemon-reload
     mount -a
 else
-    echo "[!] Advertencia: $TARGET_DISK no detectado. Usando directorio /srv/nas en disco local."
+    echo "[!] Advertencia: $TARGET_DISK no detectado como disco válido. Usando directorio /srv/nas en disco local."
     mkdir -p /srv/nas
 fi
 
@@ -345,9 +391,9 @@ ln -sf /usr/local/bin/lastb /usr/bin/lastb 2>/dev/null || true
 cat << MOTD > /etc/motd
 
 ======================================================
-  SERVIDOR EAD-COL ($SERVER_ROLE) - IP: 10.10.1.2
-  * Panel Web   : https://10.10.1.2:9090
-  * Red Windows : \\10.10.1.2 ($SMB_NETBIOS)
+  SERVIDOR EAD-COL ($SERVER_ROLE) - IP: $SERVER_IP
+  * Panel Web   : https://${SERVER_IP}:9090
+  * Red Windows : \\${SERVER_IP} ($SMB_NETBIOS)
 ======================================================
 
 MOTD
@@ -366,6 +412,6 @@ echo "==========================================================================
 echo " Rol del Servidor: $SERVER_ROLE"
 echo " Almacenamiento  : /srv/nas ($TARGET_DISK)"
 echo " Administrador   : $ADMIN_USER (con permisos sudo totales para Cockpit)"
-echo " Panel Web       : https://10.10.1.2:9090"
-echo " Red Windows     : \\\\10.10.1.2 (o \\\\$SMB_NETBIOS)"
+echo " Panel Web       : https://${SERVER_IP}:9090"
+echo " Red Windows     : \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)"
 echo "=============================================================================="

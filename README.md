@@ -92,11 +92,8 @@ ping -c 4 google.com
 
 ### Paso 7: Listar Usuarios y Otorgar Permisos de Administrador (`sudo`)
 
-1. **Listar los usuarios del sistema:**
-   ```bash
-   cut -d: -f1 /etc/passwd
-   ```
-   *(O filtrar únicamente usuarios con shell interactivo):*
+1. **Listar los usuarios:**
+   *(filtrar únicamente usuarios con shell interactivo):*
    ```bash
    grep -E '/bin/bash|/bin/sh' /etc/passwd
    ```

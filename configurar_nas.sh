@@ -11,6 +11,18 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+SERVER_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7}')
+[ -z "$SERVER_IP" ] && SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$SERVER_IP" ] && SERVER_IP="127.0.0.1"
+
+# Detección del usuario regular
+if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+    DEFAULT_USER="$SUDO_USER"
+else
+    DEFAULT_USER=$(awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "nobody" {print $1; exit}' /etc/passwd)
+    [ -z "$DEFAULT_USER" ] && DEFAULT_USER="nas"
+fi
+
 echo "[1/5] Actualizando repositorios e instalando Samba y WSDD..."
 apt-get update
 apt-get install -y samba wsdd
@@ -23,8 +35,8 @@ mkdir -p /srv/nas/privado
 chmod -R 0777 /srv/nas/publico
 chown -R nobody:nogroup /srv/nas/publico
 
-# Permisos para la carpeta privada (asociada al usuario nas)
-chown -R nas:nas /srv/nas/privado
+# Permisos para la carpeta privada (asociada al usuario detectado)
+chown -R "$DEFAULT_USER:$DEFAULT_USER" /srv/nas/privado 2>/dev/null || chown -R root:root /srv/nas/privado
 chmod -R 0770 /srv/nas/privado
 
 echo "[3/5] Respaldando y configurando /etc/samba/smb.conf..."
@@ -32,7 +44,7 @@ if [ -f /etc/samba/smb.conf ] && [ ! -f /etc/samba/smb.conf.bak ]; then
     cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
 fi
 
-cat << 'SMBCONF' > /etc/samba/smb.conf
+cat << SMBCONF > /etc/samba/smb.conf
 [global]
    workgroup = WORKGROUP
    server string = Servidor NAS (Debian)
@@ -69,13 +81,13 @@ cat << 'SMBCONF' > /etc/samba/smb.conf
    force create mode = 0777
    force directory mode = 0777
 
-# Carpeta privada del usuario 'nas' (requiere usuario y contraseña)
+# Carpeta privada (requiere usuario y contraseña)
 [Privado]
    path = /srv/nas/privado
    browseable = yes
    writable = yes
    guest ok = no
-   valid users = nas
+   valid users = $DEFAULT_USER
    create mask = 0770
    directory mask = 0770
    force create mode = 0770
@@ -95,10 +107,10 @@ echo " ¡Instalación y configuración completada con éxito!"
 echo "=============================================================================="
 echo ""
 echo "-> Siguiente paso IMPORTANTE:"
-echo "   Para acceder a la carpeta [Privado], debes establecer la contraseña de Samba para el usuario 'nas':"
-echo "   Ejecuta: sudo smbpasswd -a nas"
+echo "   Para acceder a la carpeta [Privado], debes establecer la contraseña de Samba para el usuario '$DEFAULT_USER':"
+echo "   Ejecuta: sudo smbpasswd -a $DEFAULT_USER"
 echo ""
 echo "-> Acceso desde Windows:"
-echo "   1. Presiona Win + R y escribe: \\\\10.10.1.2"
+echo "   1. Presiona Win + R y escribe: \\\\$SERVER_IP"
 echo "   2. Verás las carpetas 'Publico' y 'Privado'."
 echo "=============================================================================="
