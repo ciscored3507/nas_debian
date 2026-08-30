@@ -389,12 +389,12 @@ with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
 shares = {}
 current = None
 for line in lines:
-    m = re.match(r"^\s*\[([A-Za-z0-9_]+)\]", line)
+    m = re.match(r"^\s*\[([^\]]+)\]", line)
     if m:
-        sec = m.group(1)
+        sec = m.group(1).strip()
         if sec.lower() != "global":
             current = sec
-            shares[current] = {"path": "N/A", "valid_users": "Todos", "available": "yes"}
+            shares[current] = {"path": "N/A", "valid_users": "Todos", "available": "yes", "browseable": "yes", "read_only": "no", "write_list": ""}
         else:
             current = None
     elif current and "=" in line:
@@ -402,14 +402,27 @@ for line in lines:
         k, v = k.strip().lower(), v.strip()
         if k == "path": shares[current]["path"] = v
         elif k == "valid users": shares[current]["valid_users"] = v
+        elif k == "write list": shares[current]["write_list"] = v
+        elif k == "read only": shares[current]["read_only"] = v
+        elif k == "browseable": shares[current]["browseable"] = v
         elif k == "available": shares[current]["available"] = v
 
 for name, d in shares.items():
     st = "[ACTIVO]" if d["available"] != "no" else "[DESHABILITADO]"
-    print(f" {st} [{name}]\n   • Ruta:   {d[\"path\"]}\n   • Acceso: {d[\"valid_users\"]}\n")
+    vis = "[OCULTO $]" if d["browseable"] == "no" or name.endswith("$") else "[VISIBLE]"
+    perm = "Solo Lectura" if d["read_only"] == "yes" else "Lectura/Escritura"
+    p = d["path"]
+    w = d["write_list"]
+    u = d["valid_users"]
+    print(f" {st} {vis} [{name}]")
+    print(f"   • Ruta:      {p}")
+    print(f"   • Permisos:  {perm}")
+    if w:
+        print(f"   • Escritura: {w}")
+    print(f"   • Acceso:    {u}\n")
 ')
                 [ -z "$LISTA_DETALLADA" ] && LISTA_DETALLADA="No hay recursos compartidos configurados."
-                whiptail --title "Recursos Compartidos Activos en el NAS" --ok-button "< Aceptar >" --msgbox "$LISTA_DETALLADA" 21 76
+                whiptail --title "Recursos Compartidos Activos en el NAS" --ok-button "< Aceptar >" --msgbox "$LISTA_DETALLADA" 22 76
                 ;;
 
             2)
@@ -651,8 +664,8 @@ SMBCONF
 import re
 with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
     text = f.read()
-for m in re.finditer(r"\[([A-Za-z0-9_]+)\]", text):
-    s = m.group(1)
+for m in re.finditer(r"\[([^\]]+)\]", text):
+    s = m.group(1).strip()
     if s.lower() != "global":
         sec_start = m.start()
         next_sec = text.find("[", sec_start + 1)
@@ -686,7 +699,7 @@ target = sys.argv[1]
 with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
     text = f.read()
 
-pattern = re.compile(rf"(\[{target}\][\s\S]*?)(?=\n\[|\Z)")
+pattern = re.compile(rf"(\[{re.escape(target)}\][\s\S]*?)(?=\n\[|\Z)")
 m = pattern.search(text)
 if m:
     block = m.group(1)
@@ -704,15 +717,23 @@ if m:
         f.write(text)
     print(msg)
 ' "$TARGET_SHARE")
-                        testparm -s &>/dev/null
-                        smbcontrol all reload-config 2>/dev/null || systemctl reload smbd
+                        testparm -s &>/dev/null || true
+                        smbcontrol all reload-config 2>/dev/null || systemctl reload smbd 2>/dev/null || true
                         whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" --msgbox "✔ El recurso \"[$TARGET_SHARE]\" ahora está:\n$NUEVO_ESTADO" 9 55
                     fi
                 fi
                 ;;
 
             4)
-                LISTA_ELIMINAR=$(grep -E "^\[" /etc/samba/smb.conf | grep -v "global" | tr -d "[]")
+                LISTA_ELIMINAR=$(python3 -c '
+import re
+with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
+    lines = f.readlines()
+for line in lines:
+    m = re.match(r"^\s*\[([^\]]+)\]", line)
+    if m and m.group(1).strip().lower() != "global":
+        print(m.group(1).strip())
+')
                 if [ -z "$LISTA_ELIMINAR" ]; then
                     whiptail --ok-button "< Aceptar >" --msgbox "No hay recursos disponibles para eliminar." 8 45
                     continue
@@ -739,14 +760,14 @@ target = sys.argv[1]
 with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
     text = f.read()
 
-text = re.sub(rf"# =+\n# RECURSO COMPARTIDO: {target}\n# =+\n", "", text)
-text = re.sub(rf"\[{target}\][\s\S]*?(?=\n\[|\Z)", "", text)
+text = re.sub(rf"# =+\n# RECURSO COMPARTIDO: {re.escape(target)}\n# =+\n", "", text)
+text = re.sub(rf"\[{re.escape(target)}\][\s\S]*?(?=\n\[|\Z)", "", text)
 
 with open("/etc/samba/smb.conf", "w", encoding="utf-8") as f:
     f.write(text.strip() + "\n")
 ' "$SHARE_A_BORRAR"
-                        testparm -s &>/dev/null
-                        smbcontrol all reload-config 2>/dev/null || systemctl reload smbd
+                        testparm -s &>/dev/null || true
+                        smbcontrol all reload-config 2>/dev/null || systemctl reload smbd 2>/dev/null || true
                         whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" --msgbox "✔ El recurso \"[$SHARE_A_BORRAR]\" ha sido eliminado de la red Samba." 8 60
                     fi
                 fi
