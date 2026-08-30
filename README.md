@@ -17,7 +17,7 @@ Para realizar configuraciones administrativas a nivel de sistema:
 ```bash
 su -
 ```
-> Ingrese la contraseña de `root` definida durante la instalación de Debian.
+> **IMPORTANTE:** Es fundamental incluir el espacio y el guion (`su -`). Esto asegura que Debian cargue el entorno completo de `root`, incluyendo el directorio de utilidades del sistema (`/usr/sbin/`) en tu `$PATH`.
 
 ---
 
@@ -92,13 +92,12 @@ ping -c 4 google.com
 
 ### Paso 7: Listar Usuarios y Otorgar Permisos de Administrador (`sudo`)
 
-1. **Listar los usuarios:**
-   *(filtrar únicamente usuarios con shell interactivo):*
+1. **Listar usuarios con shell interactivo:**
    ```bash
    grep -E '/bin/bash|/bin/sh' /etc/passwd
    ```
 
-2. **Convertir un usuario estándar en administrador:**
+2. **Instalar `sudo` y agregar al usuario estándar:**
    ```bash
    apt install -y sudo
    usermod -aG sudo <nombre_usuario>
@@ -106,6 +105,14 @@ ping -c 4 google.com
    *Ejemplo para el usuario `jose`:*
    ```bash
    usermod -aG sudo jose
+   ```
+   *(Si el sistema no encuentra la orden `usermod`, ejecuta `/usr/sbin/usermod -aG sudo jose`).*
+
+3. **Aplicar los permisos en la terminal activa:**
+   Sal del usuario root y recarga la pertenencia a los grupos en tu usuario estándar:
+   ```bash
+   exit
+   newgrp sudo
    ```
 
 ---
