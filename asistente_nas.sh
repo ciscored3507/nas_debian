@@ -10,8 +10,11 @@ if [ "$EUID" -ne 0 ]; then
   exec sudo bash "$0" "$@"
 fi
 
-# Restablecer colores nativos estándar
+# Restablecer colores nativos estándar y asegurar terminal compatible
 unset NEWT_COLORS
+if [ -z "$TERM" ] || [ "$TERM" = "dumb" ] || [ "$TERM" = "unknown" ]; then
+    export TERM="xterm-256color"
+fi
 
 # Colores ANSI para terminal
 C_CYAN="\033[1;36m"
@@ -267,9 +270,15 @@ INCLUYE PARCHES AUTOMATICOS:
         echo "  ╰──────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
         
         bash "$SCRIPT_DIR/ejecutar_configuracion_ead.sh" "$DISCO_SELECCIONADO" "$SMB_WORKGROUP" "$SMB_NETBIOS" "$ADMIN_USER" "$ADMIN_PASS" "$ROL_SERVER"
+        local ret_exec=$?
         
-        whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
-            --msgbox "✔ ¡Despliegue completado con éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://${SERVER_IP}:9090\n• Usuario Cockpit: $ADMIN_USER\n• Red Windows:     \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)" 13 70
+        if [ $ret_exec -eq 0 ]; then
+            whiptail --title "$APP_TITLE" --ok-button "< Finalizar >" \
+                --msgbox "✔ ¡Despliegue completado con éxito!\n\n• Rol:             $ROL_SERVER\n• Panel Web:       https://${SERVER_IP}:9090\n• Usuario Cockpit: $ADMIN_USER\n• Red Windows:     \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)" 13 70
+        else
+            whiptail --title "Error en el Despliegue" --ok-button "< Aceptar >" \
+                --msgbox "✖ Ocurrió un error durante la ejecución del script de despliegue (Código de salida: $ret_exec).\n\nRevisa los mensajes anteriores en la consola." 12 70
+        fi
     fi
 }
 
@@ -336,6 +345,12 @@ gestionar_grupos() {
 # 3. FUNCIÓN: GESTIÓN DE RECURSOS COMPARTIDOS (CARPETAS EN RED)
 # ==============================================================================
 gestionar_recursos_compartidos() {
+    if [ ! -f /etc/samba/smb.conf ]; then
+        whiptail --title "Aviso del Sistema" --ok-button "< Aceptar >" \
+            --msgbox "Samba aún no ha sido instalado o configurado en este servidor.\n\nPor favor, ejecuta primero la opción [1] Desplegar Servidor." 10 65
+        return
+    fi
+
     while true; do
         OPC_REC=$(whiptail --title "$APP_TITLE" \
             --ok-button "< Seleccionar >" --cancel-button "< Volver >" \

@@ -88,11 +88,12 @@ elif [ -n "$ROOT_DISK" ] && [ "$TARGET_DISK" == "/dev/$ROOT_DISK" ]; then
     mkdir -p /srv/nas
 elif [ -b "$TARGET_DISK" ]; then
     echo " [i] Formateando disco secundario dedicado: $TARGET_DISK"
+    swapoff ${TARGET_DISK}* 2>/dev/null || true
     umount ${TARGET_DISK}* 2>/dev/null || true
 
     parted "$TARGET_DISK" --script mklabel gpt
     parted "$TARGET_DISK" --script mkpart primary ext4 0% 100%
-    sleep 2
+    partprobe "$TARGET_DISK" 2>/dev/null || sleep 2
 
     PART_NAS="${TARGET_DISK}1"
     [ ! -b "$PART_NAS" ] && PART_NAS="${TARGET_DISK}p1"
@@ -103,28 +104,37 @@ elif [ -b "$TARGET_DISK" ]; then
     mkfs.ext4 -F -L "$LABEL_NAME" "$PART_NAS"
 
     mkdir -p /srv/nas
-    UUID_NAS=$(blkid -s UUID -o value "$PART_NAS")
+    UUID_NAS=$(blkid -s UUID -o value "$PART_NAS" 2>/dev/null || lsblk -no UUID "$PART_NAS" 2>/dev/null || true)
     sed -i '\|/srv/nas|d' /etc/fstab
-    echo "UUID=${UUID_NAS}  /srv/nas  ext4  defaults,noatime  0  2" >> /etc/fstab
+    if [ -n "$UUID_NAS" ]; then
+        echo "UUID=${UUID_NAS}  /srv/nas  ext4  defaults,noatime  0  2" >> /etc/fstab
+    else
+        echo "${PART_NAS}  /srv/nas  ext4  defaults,noatime  0  2" >> /etc/fstab
+    fi
 
     systemctl daemon-reload
-    mount -a
+    mount -a || mount "$PART_NAS" /srv/nas || true
 else
     echo "[!] Advertencia: $TARGET_DISK no detectado como disco válido. Usando directorio /srv/nas en disco local."
     mkdir -p /srv/nas
 fi
 
 echo " [3/9] Instalando Samba, WSDD2, Cockpit y utilidades de Backup..."
+mkdir -p /run/samba /var/log/samba /var/lib/samba/printers
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
     samba wsdd2 smbclient rsync cifs-utils cron wget curl \
     cockpit cockpit-storaged cockpit-networkmanager cockpit-packagekit
 
-cd /tmp
-wget -q -O cockpit-file-sharing.deb https://github.com/45Drives/cockpit-file-sharing/releases/download/v4.6.1-2/cockpit-file-sharing_4.6.1-2trixie_all.deb || true
-wget -q -O cockpit-identities.deb https://github.com/45Drives/cockpit-identities/releases/download/v0.1.14-1/cockpit-identities_0.1.14-1trixie_all.deb || true
-wget -q -O cockpit-navigator.deb https://github.com/45Drives/cockpit-navigator/releases/download/v0.5.10/cockpit-navigator_0.5.10-1focal_all.deb || true
+rm -f /tmp/cockpit-*.deb
+wget -q -O /tmp/cockpit-file-sharing.deb https://github.com/45Drives/cockpit-file-sharing/releases/download/v4.6.1-2/cockpit-file-sharing_4.6.1-2trixie_all.deb 2>/dev/null || true
+wget -q -O /tmp/cockpit-identities.deb https://github.com/45Drives/cockpit-identities/releases/download/v0.1.14-1/cockpit-identities_0.1.14-1trixie_all.deb 2>/dev/null || true
+wget -q -O /tmp/cockpit-navigator.deb https://github.com/45Drives/cockpit-navigator/releases/download/v0.5.10/cockpit-navigator_0.5.10-1focal_all.deb 2>/dev/null || true
 
-apt-get install -y ./cockpit-file-sharing.deb ./cockpit-identities.deb ./cockpit-navigator.deb || apt-get install -f -y
+for deb_pkg in /tmp/cockpit-file-sharing.deb /tmp/cockpit-identities.deb /tmp/cockpit-navigator.deb; do
+    if [ -s "$deb_pkg" ]; then
+        apt-get install -y "$deb_pkg" 2>/dev/null || dpkg -i "$deb_pkg" 2>/dev/null || true
+    fi
+done
 rm -f /tmp/cockpit-*.deb
 
 # Configurar WSDD2
@@ -142,7 +152,7 @@ WSDDOVERRIDE
 
 echo " [4/9] Creando grupos y configurando Administrador ($ADMIN_USER)..."
 if [ "$SERVER_ROLE" == "BACKUP" ]; then
-    # El servidor de backup SOLO contiene grupos tecnicos de administracion
+    # El servidor de backup SOLO contiene grupos técnicos de administración
     groupadd -f grp_sistemas
     groupadd -f grp_backups
 else
@@ -162,13 +172,18 @@ if ! id "$ADMIN_USER" &>/dev/null; then
     adduser --disabled-password --gecos "" "$ADMIN_USER"
 fi
 
-usermod -aG sudo,adm,grp_empleados_ead,grp_sistemas,grp_backups "$ADMIN_USER"
+if [ "$SERVER_ROLE" == "BACKUP" ]; then
+    usermod -aG sudo,adm,grp_sistemas,grp_backups "$ADMIN_USER"
+else
+    usermod -aG sudo,adm,grp_empleados_ead,grp_sistemas,grp_backups "$ADMIN_USER"
+fi
+
 echo "$ADMIN_USER ALL=(ALL:ALL) ALL" > "/etc/sudoers.d/$ADMIN_USER"
 chmod 0440 "/etc/sudoers.d/$ADMIN_USER"
 
 if [ -n "$ADMIN_PASS" ]; then
     echo "${ADMIN_USER}:${ADMIN_PASS}" | chpasswd
-    echo -e "${ADMIN_PASS}\n${ADMIN_PASS}" | smbpasswd -a -s "$ADMIN_USER"
+    echo -e "${ADMIN_PASS}\n${ADMIN_PASS}" | smbpasswd -a -s "$ADMIN_USER" 2>/dev/null || true
 fi
 
 echo " [5/9] Creando estructura de directorios y permisos según el rol ($SERVER_ROLE)..."
