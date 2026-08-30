@@ -140,7 +140,11 @@ cat << SMBCONF > /etc/samba/smb.conf
    logging = file
 SMBCONF
 
-echo " [7/9] Aplicando parches de compatibilidad en español para Cockpit..."
+echo " [7/9] Aplicando parches de compatibilidad en español y límites de cuentas para Cockpit..."
+sed -i 's/^UID_MIN.*/UID_MIN\t\t\t 1000/' /etc/login.defs 2>/dev/null || true
+grep -q "^SYS_UID_MAX" /etc/login.defs || echo -e "SYS_UID_MAX\t\t 999" >> /etc/login.defs
+grep -q "^SYS_GID_MAX" /etc/login.defs || echo -e "SYS_GID_MAX\t\t 999" >> /etc/login.defs
+
 mkdir -p /root/.ssh "/home/$ADMIN_USER/.ssh" /etc/skel/.ssh /nonexistent/.ssh
 chmod 700 /root/.ssh "/home/$ADMIN_USER/.ssh" /etc/skel/.ssh 2>/dev/null || true
 chmod 755 /nonexistent/.ssh 2>/dev/null || true
