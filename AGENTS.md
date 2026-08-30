@@ -15,6 +15,12 @@ Este documento contiene la **especificación técnica completa, inventario de sc
 * **Credenciales Administrativas de Entorno:**
   * Usuario: `nas` / `root`
   * Contraseña predeterminada: `DE0puFvp85#`
+* **Convención de Commits de Git:**
+  * Todos los mensajes de commit deben redactarse en **español** siguiendo el estándar convencional:
+    * `feat: <descripción en español>` (nuevas características)
+    * `fix: <descripción en español>` (corrección de errores)
+    * `docs: <descripción en español>` (documentación)
+    * `refactor: <descripción en español>` (mejoras de código)
 
 ---
 
