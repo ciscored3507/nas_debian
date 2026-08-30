@@ -7,19 +7,87 @@ gestionar_backups() {
     while true; do
         OPC_BKP=$(whiptail --title "$APP_TITLE" \
             --ok-button "< Seleccionar >" --cancel-button "< Volver >" \
-            --menu "GESTIÓN DE TAREAS DE COPIAS DE SEGURIDAD:" 17 72 5 \
-            "1" "[+] Nueva Tarea: Servidor Windows / Carpeta SMB (CIFS)" \
-            "2" "[+] Nueva Tarea: Servidor Linux Remoto (SSH + Rsync)" \
-            "3" "[+] Nueva Tarea: Carpeta Local del Servidor" \
-            "4" "[-] Eliminar una Tarea de Backup Programada" \
-            "5" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
+            --menu "GESTIÓN DE TAREAS DE COPIAS DE SEGURIDAD:" 18 72 6 \
+            "1" "[*] Listar Tareas de Backup Programadas" \
+            "2" "[+] Nueva Tarea: Servidor Windows / Carpeta SMB (CIFS)" \
+            "3" "[+] Nueva Tarea: Servidor Linux Remoto (SSH + Rsync)" \
+            "4" "[+] Nueva Tarea: Carpeta Local del Servidor" \
+            "5" "[-] Eliminar una Tarea de Backup Programada" \
+            "6" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
 
-        if [ $? -ne 0 ] || [ "$OPC_BKP" == "5" ]; then
+        if [ $? -ne 0 ] || [ "$OPC_BKP" == "6" ]; then
             break
         fi
 
         case "$OPC_BKP" in
             1)
+                TABLA_BKPS=$(python3 -c '
+import glob, os, re
+
+runners = glob.glob("/usr/local/bin/backup_*.sh")
+rows = []
+
+for r in runners:
+    tname = os.path.basename(r).replace("backup_", "").replace(".sh", "")
+    proto = "Local"
+    src = "N/A"
+    ret = "30 snaps"
+    
+    with open(r, "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+        if "cifs" in content:
+            proto = "CIFS (Win)"
+            m_ip = re.search(r"SRC_IP=\"([^\"]+)\"", content)
+            m_sh = re.search(r"SRC_SHARE=\"([^\"]+)\"", content)
+            if m_ip and m_sh:
+                src = f"//{m_ip.group(1)}/{m_sh.group(1)}"
+        elif "sshpass" in content or "ssh -p" in content:
+            proto = "SSH (Linux)"
+            m_ip = re.search(r"SRC_IP=\"([^\"]+)\"", content)
+            m_pt = re.search(r"SRC_PATH=\"([^\"]+)\"", content)
+            m_us = re.search(r"SRC_USER=\"([^\"]+)\"", content)
+            if m_ip and m_pt:
+                src = f"{m_us.group(1)}@{m_ip.group(1)}:{m_pt.group(1)}"
+        else:
+            proto = "Local"
+            m_pt = re.search(r"SRC_PATH=\"([^\"]+)\"", content)
+            if m_pt: src = m_pt.group(1)
+        
+        m_ret = re.search(r"RETENTION=(\d+)", content)
+        if m_ret: ret = f"{m_ret.group(1)} snaps"
+
+    cron_file = f"/etc/cron.d/backup_{tname}"
+    cron_sched = "Manual"
+    if os.path.exists(cron_file):
+        with open(cron_file, "r") as cf:
+            c_line = cf.read().strip()
+            parts = c_line.split()
+            if len(parts) >= 5:
+                cron_sched = " ".join(parts[:5])
+
+    rows.append((tname, proto, src, cron_sched, ret))
+
+if not rows:
+    print("  (No hay tareas de backup programadas actualmente)")
+    exit(0)
+
+w_name = max(max(len(r[0]) for r in rows), 16)
+w_prot = max(max(len(r[1]) for r in rows), 11)
+w_src  = max(max(len(r[2]) for r in rows), 24)
+w_cron = max(max(len(r[3]) for r in rows), 12)
+w_ret  = max(max(len(r[4]) for r in rows), 10)
+
+print(f"┌─{"─"*w_name}─┬─{"─"*w_prot}─┬─{"─"*w_src}─┬─{"─"*w_cron}─┬─{"─"*w_ret}─┐")
+print(f"│ {"IDENTIFICADOR".ljust(w_name)} │ {"PROTOCOLO".ljust(w_prot)} │ {"ORIGEN REMOTO / LOCAL".ljust(w_src)} │ {"HORARIO CRON".ljust(w_cron)} │ {"RETENCIÓN".ljust(w_ret)} │")
+print(f"├─{"─"*w_name}─┼─{"─"*w_prot}─┼─{"─"*w_src}─┼─{"─"*w_cron}─┼─{"─"*w_ret}─┤")
+for r in rows:
+    print(f"│ {r[0].ljust(w_name)} │ {r[1].ljust(w_prot)} │ {r[2].ljust(w_src)} │ {r[3].ljust(w_cron)} │ {r[4].ljust(w_ret)} │")
+print(f"└─{"─"*w_name}─┴─{"─"*w_prot}─┴─{"─"*w_src}─┴─{"─"*w_cron}─┴─{"─"*w_ret}─┘")
+')
+                whiptail --title "CRUD: Tareas de Backup Programadas" --ok-button "< Aceptar >" --msgbox "$TABLA_BKPS" 18 78
+                ;;
+
+            2)
                 # Respaldo de Servidor Windows (CIFS / SMB)
                 TASK_NAME=$(whiptail --title "Paso 1 de 5: Identificador de Tarea" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
@@ -271,7 +339,7 @@ RUNNER_EOF
                     --msgbox "✔ ¡Tarea de Backup Linux \"[$TASK_NAME]\" creada!\n\n• Origen:      $LNX_USER@$LNX_IP:$LNX_PATH (SSH)\n• Destino:     /srv/nas/BACKUPS_HISTORICOS/$TASK_NAME\n• Frecuencia:  $CRON_EXPR\n• Retención:   $RETENTION snapshots deduplicados" 14 72
                 ;;
 
-            3)
+            4)
                 # Respaldo de Carpeta Local
                 TASK_NAME=$(whiptail --title "Paso 1 de 4: Identificador de Tarea" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
@@ -341,7 +409,7 @@ RUNNER_EOF
                     --msgbox "✔ ¡Tarea de Backup Local \"[$TASK_NAME]\" programada exitosamente!" 8 60
                 ;;
 
-            4)
+            5)
                 # Eliminar tarea
                 TAREAS_DEL=$(ls -1 /usr/local/bin/backup_*.sh 2>/dev/null | sed "s|/usr/local/bin/backup_||; s|\.sh||" || echo "")
                 if [ -z "$TAREAS_DEL" ]; then

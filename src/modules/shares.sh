@@ -26,47 +26,68 @@ gestionar_recursos_compartidos() {
 
         case "$OPC_SHARE" in
             1)
-                LISTA_DETALLADA=$(python3 -c '
+                TABLA_SHARES=$(python3 -c '
 import re
+
 with open("/etc/samba/smb.conf", "r", encoding="utf-8") as f:
     lines = f.readlines()
-shares = {}
+
+shares = []
 current = None
+cur_data = {}
+
 for line in lines:
     m = re.match(r"^\s*\[([^\]]+)\]", line)
     if m:
         sec = m.group(1).strip()
         if sec.lower() != "global":
+            if current:
+                shares.append((current, cur_data))
             current = sec
-            shares[current] = {"path": "N/A", "valid_users": "Todos", "available": "yes", "browseable": "yes", "read_only": "no", "write_list": ""}
+            cur_data = {"path": "N/A", "valid": "Todos", "available": "yes", "browseable": "yes", "read_only": "no", "write_list": "-"}
         else:
+            if current:
+                shares.append((current, cur_data))
             current = None
     elif current and "=" in line:
         k, v = line.split("=", 1)
         k, v = k.strip().lower(), v.strip()
-        if k == "path": shares[current]["path"] = v
-        elif k == "valid users": shares[current]["valid_users"] = v
-        elif k == "write list": shares[current]["write_list"] = v
-        elif k == "read only": shares[current]["read_only"] = v
-        elif k == "browseable": shares[current]["browseable"] = v
-        elif k == "available": shares[current]["available"] = v
+        if k == "path": cur_data["path"] = v
+        elif k == "valid users": cur_data["valid"] = v
+        elif k == "write list": cur_data["write_list"] = v
+        elif k == "read only": cur_data["read_only"] = v
+        elif k == "browseable": cur_data["browseable"] = v
+        elif k == "available": cur_data["available"] = v
 
-for name, d in shares.items():
-    st = "[ACTIVO]" if d["available"] != "no" else "[DESHABILITADO]"
-    vis = "[OCULTO $]" if d["browseable"] == "no" or name.endswith("$") else "[VISIBLE]"
-    perm = "Solo Lectura" if d["read_only"] == "yes" else "Lectura/Escritura"
-    p = d["path"]
-    w = d["write_list"]
-    u = d["valid_users"]
-    print(f" {st} {vis} [{name}]")
-    print(f"   • Ruta:      {p}")
-    print(f"   • Permisos:  {perm}")
-    if w:
-        print(f"   • Escritura: {w}")
-    print(f"   • Acceso:    {u}\n")
+if current:
+    shares.append((current, cur_data))
+
+rows = []
+for name, d in shares:
+    estado = "● Activo" if d["available"] != "no" else "○ Deshab."
+    vis = "Oculto ($)" if d["browseable"] == "no" or name.endswith("$") else "Visible"
+    perm = "Solo Lectura" if d["read_only"] == "yes" else "Lect/Escr"
+    path = d["path"]
+    rows.append((name, estado, vis, perm, path))
+
+if not rows:
+    print("  (No hay recursos compartidos configurados)")
+    exit(0)
+
+w_name = max(max(len(r[0]) for r in rows), 14)
+w_est  = max(max(len(r[1]) for r in rows), 8)
+w_vis  = max(max(len(r[2]) for r in rows), 11)
+w_perm = max(max(len(r[3]) for r in rows), 12)
+w_path = max(max(len(r[4]) for r in rows), 20)
+
+print(f"┌─{"─"*w_name}─┬─{"─"*w_est}─┬─{"─"*w_vis}─┬─{"─"*w_perm}─┬─{"─"*w_path}─┐")
+print(f"│ {"RECURSO".ljust(w_name)} │ {"ESTADO".ljust(w_est)} │ {"VISIBILIDAD".ljust(w_vis)} │ {"PERMISOS".ljust(w_perm)} │ {"RUTA EN DISCO".ljust(w_path)} │")
+print(f"├─{"─"*w_name}─┼─{"─"*w_est}─┼─{"─"*w_vis}─┼─{"─"*w_perm}─┼─{"─"*w_path}─┤")
+for r in rows:
+    print(f"│ {r[0].ljust(w_name)} │ {r[1].ljust(w_est)} │ {r[2].ljust(w_vis)} │ {r[3].ljust(w_perm)} │ {r[4].ljust(w_path)} │")
+print(f"└─{"─"*w_name}─┴─{"─"*w_est}─┴─{"─"*w_vis}─┴─{"─"*w_perm}─┴─{"─"*w_path}─┘")
 ')
-                [ -z "$LISTA_DETALLADA" ] && LISTA_DETALLADA="No hay recursos compartidos configurados."
-                whiptail --title "Recursos Compartidos Activos en el NAS" --ok-button "< Aceptar >" --msgbox "$LISTA_DETALLADA" 22 76
+                whiptail --title "CRUD: Recursos Compartidos (Samba)" --ok-button "< Aceptar >" --msgbox "$TABLA_SHARES" 20 78
                 ;;
 
             2)

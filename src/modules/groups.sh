@@ -19,13 +19,32 @@ gestionar_grupos() {
 
         case "$OPC_GRP" in
             1)
-                LISTA_GRUPOS=$(awk -F: '$1 ~ /^grp_/ {
-                    miembros = ($4 != "") ? $4 : "(sin miembros)"
-                    printf "  • %-22s (GID: %-4s) | Miembros: %s\n", $1, $3, miembros
-                }' /etc/group | sort)
-                [ -z "$LISTA_GRUPOS" ] && LISTA_GRUPOS="  (No se encontraron grupos creados)"
-                whiptail --title "Grupos de Seguridad Creados" --ok-button "< Aceptar >" \
-                    --msgbox "GRUPOS CREADOS EN EL SISTEMA:\n\n$LISTA_GRUPOS" 18 72
+                TABLA_GRUPOS=$(python3 -c '
+groups = []
+with open("/etc/group", "r", encoding="utf-8") as f:
+    for line in f:
+        parts = line.strip().split(":")
+        if len(parts) >= 4 and parts[0].startswith("grp_"):
+            gname, gid, members = parts[0], parts[2], parts[3] if parts[3] else "(sin miembros)"
+            groups.append((gname, gid, members))
+
+if not groups:
+    print("  (No se encontraron grupos de seguridad creados)")
+    exit(0)
+
+w_name = max(max(len(g[0]) for g in groups), 20)
+w_gid  = max(max(len(g[1]) for g in groups), 6)
+w_mem  = max(max(len(g[2]) for g in groups), 28)
+
+print(f"┌─{"─"*w_name}─┬─{"─"*w_gid}─┬─{"─"*w_mem}─┐")
+print(f"│ {"NOMBRE DEL GRUPO".ljust(w_name)} │ {"GID".ljust(w_gid)} │ {"USUARIOS MIEMBROS".ljust(w_mem)} │")
+print(f"├─{"─"*w_name}─┼─{"─"*w_gid}─┼─{"─"*w_mem}─┤")
+for gname, gid, members in sorted(groups, key=lambda x: x[0]):
+    print(f"│ {gname.ljust(w_name)} │ {gid.ljust(w_gid)} │ {members.ljust(w_mem)} │")
+print(f"└─{"─"*w_name}─┴─{"─"*w_gid}─┴─{"─"*w_mem}─┘")
+')
+                whiptail --title "CRUD: Grupos de Seguridad" --ok-button "< Aceptar >" \
+                    --msgbox "$TABLA_GRUPOS" 18 76
                 ;;
 
             2)

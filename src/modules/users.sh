@@ -95,19 +95,37 @@ gestionar_usuarios() {
 
         case "$OPC_USR" in
             1)
-                LISTA_USERS=$(pdbedit -L 2>/dev/null | cut -d: -f1)
-                if [ -z "$LISTA_USERS" ]; then
-                    whiptail --title "Usuarios Registrados" --ok-button "< Aceptar >" \
-                        --msgbox "No hay usuarios registrados en Samba actualmente." 8 50
-                    continue
-                fi
+                TABLA_USERS=$(python3 -c '
+import subprocess
 
-                TXT_USERS="  USUARIO            | GRUPOS ASIGNADOS\n  ─────────────────────────────────────────────────────────────────\n"
-                for u in $LISTA_USERS; do
-                    grps=$(id -Gn "$u" 2>/dev/null | tr ' ' '\n' | grep -E '^grp_|^[a-z0-9_-]+' | grep -vE '^(cdrom|floppy|audio|dip|video|plugdev|users|netdev|scanner|bluetooth|lpadmin|nobody|nogroup)$' | tr '\n' ',' | sed 's/,$//')
-                    TXT_USERS="${TXT_USERS}$(printf "  %-18s | %s\n" "$u" "$grps")"
-                done
-                whiptail --title "Usuarios Registrados en Samba" --ok-button "< Aceptar >" --msgbox "$TXT_USERS" 18 72
+out = subprocess.run(["pdbedit", "-L"], capture_output=True, text=True)
+users = [line.split(":")[0] for line in out.stdout.strip().split("\n") if line.strip()]
+
+rows = []
+for u in users:
+    grp_out = subprocess.run(["id", "-Gn", u], capture_output=True, text=True)
+    all_grps = grp_out.stdout.strip().split()
+    sec_grps = [g for g in all_grps if g.startswith("grp_")]
+    is_admin = "Admin (sudo)" if "sudo" in all_grps or "adm" in all_grps else "Usuario Samba"
+    grps_str = ", ".join(sec_grps) if sec_grps else "(sin grupos grp_*)"
+    rows.append((u, is_admin, grps_str))
+
+if not rows:
+    print("  (No hay usuarios registrados en Samba actualmente)")
+    exit(0)
+
+w_user = max(max(len(r[0]) for r in rows), 16)
+w_role = max(max(len(r[1]) for r in rows), 14)
+w_grps = max(max(len(r[2]) for r in rows), 30)
+
+print(f"┌─{"─"*w_user}─┬─{"─"*w_role}─┬─{"─"*w_grps}─┐")
+print(f"│ {"USUARIO SAMBA".ljust(w_user)} │ {"ROL / TIPO".ljust(w_role)} │ {"GRUPOS ASIGNADOS (grp_*)".ljust(w_grps)} │")
+print(f"├─{"─"*w_user}─┼─{"─"*w_role}─┼─{"─"*w_grps}─┤")
+for r in rows:
+    print(f"│ {r[0].ljust(w_user)} │ {r[1].ljust(w_role)} │ {r[2].ljust(w_grps)} │")
+print(f"└─{"─"*w_user}─┴─{"─"*w_role}─┴─{"─"*w_grps}─┘")
+')
+                whiptail --title "CRUD: Usuarios Registrados en Samba" --ok-button "< Aceptar >" --msgbox "$TABLA_USERS" 18 78
                 ;;
 
             2)
