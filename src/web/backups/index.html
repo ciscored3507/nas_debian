@@ -1,271 +1,256 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full">
+<html lang="es" class="pf-v6-m-tabular-nums" id="backups-page">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Backups</title>
+    <link href="cockpit.css" type="text/css" rel="stylesheet" />
     <script src="../base1/cockpit.js"></script>
-    <link rel="stylesheet" href="../identities/assets/index.40bb9426.css">
     <style>
         :root {
-            --cockpit-bg: #111317;
-            --card-bg: #1c2028;
-            --card-header-bg: #222731;
-            --border-color: #313745;
-            --text-main: #f0f3f6;
-            --text-muted: #8b949e;
-            --accent-blue: #388bfd;
-            --accent-green: #238636;
-            --accent-green-hover: #2ea043;
-            --accent-red: #da3633;
-            --input-bg: #14171e;
+            --ct-bg-dark: #151515;
+            --ct-card-bg: #212427;
+            --ct-card-header: #1c1e21;
+            --ct-border: #3c3f42;
+            --ct-text: #f0f0f0;
+            --ct-text-muted: #8a8d90;
+            --ct-blue: #06c;
+            --ct-blue-hover: #004080;
+            --ct-green: #3e8635;
+            --ct-green-hover: #2e6627;
+            --ct-red: #c9190b;
         }
 
         body {
-            background-color: var(--cockpit-bg);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0;
             padding: 24px;
+            margin: 0;
             box-sizing: border-box;
+            background-color: var(--ct-bg-dark);
+            color: var(--ct-text);
+            font-family: RedHatText, "Red Hat Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
 
-        .container {
-            max-width: 1180px;
+        .ct-container {
+            max-width: 1200px;
             margin: 0 auto;
         }
 
-        /* Top Header */
-        .page-header {
+        .ct-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
             padding-bottom: 16px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--ct-border);
         }
 
-        .page-header h1 {
+        .ct-header h1 {
             font-size: 22px;
             font-weight: 700;
             margin: 0 0 4px 0;
             color: #ffffff;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
-        .page-header p {
+        .ct-header p {
             margin: 0;
-            font-size: 13px;
-            color: var(--text-muted);
+            font-size: 13.5px;
+            color: var(--ct-text-muted);
         }
 
-        /* Modern Tabs */
-        .nav-tabs {
+        /* Tabs */
+        .ct-tabs {
             display: flex;
             gap: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--ct-border);
         }
 
-        .nav-tab-item {
-            background: #181b22;
-            color: var(--text-muted);
-            border: 1px solid var(--border-color);
-            padding: 8px 18px;
-            border-radius: 6px;
-            font-size: 13.5px;
+        .ct-tab-btn {
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--ct-text-muted);
+            padding: 10px 18px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.15s ease-in-out;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
-        .nav-tab-item:hover {
+        .ct-tab-btn:hover {
             color: #ffffff;
-            background: #232834;
-            border-color: #444c5e;
+            border-bottom-color: #6a6e73;
         }
 
-        .nav-tab-item.active {
-            background: var(--accent-blue);
-            color: #ffffff;
-            border-color: var(--accent-blue);
-            box-shadow: 0 2px 8px rgba(56, 139, 253, 0.35);
+        .ct-tab-btn.active {
+            color: var(--ct-blue);
+            border-bottom-color: var(--ct-blue);
         }
 
         /* Cards */
-        .app-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            overflow: hidden;
+        .ct-card {
+            background: var(--ct-card-bg);
+            border: 1px solid var(--ct-border);
+            border-radius: 6px;
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
             margin-bottom: 24px;
         }
 
-        .app-card-header {
-            background: var(--card-header-bg);
+        .ct-card-header {
+            background: var(--ct-card-header);
             padding: 14px 20px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--ct-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .app-card-title {
+        .ct-card-title {
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 700;
             margin: 0;
             color: #ffffff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
-        .app-card-body {
-            padding: 20px;
+        .ct-card-body {
+            padding: 22px;
         }
 
         /* Table */
-        .data-table {
+        .ct-table {
             width: 100%;
             border-collapse: collapse;
             text-align: left;
         }
 
-        .data-table th {
-            background: #171a22;
-            color: #8b949e;
+        .ct-table th {
+            background: #181b1e;
+            color: var(--ct-text-muted);
             font-size: 11.5px;
             text-transform: uppercase;
             letter-spacing: 0.6px;
             padding: 12px 16px;
             font-weight: 700;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--ct-border);
         }
 
-        .data-table td {
+        .ct-table td {
             padding: 14px 16px;
-            border-bottom: 1px solid #282d39;
+            border-bottom: 1px solid #2d3034;
             font-size: 13.5px;
             vertical-align: middle;
         }
 
-        .data-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
+        .ct-table tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
         }
 
-        /* Protocol Picker */
-        .proto-grid {
+        /* Protocol Grid */
+        .ct-proto-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
+            gap: 16px;
             margin-bottom: 24px;
         }
 
-        .proto-box {
-            background: var(--input-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
+        .ct-proto-card {
+            background: #181b1e;
+            border: 2px solid var(--ct-border);
+            border-radius: 6px;
             padding: 18px;
             cursor: pointer;
             transition: all 0.2s;
             text-align: center;
         }
 
-        .proto-box:hover {
-            border-color: #4a5468;
-            background: #181c26;
+        .ct-proto-card:hover {
+            border-color: #555b63;
         }
 
-        .proto-box.active {
-            border-color: var(--accent-blue);
-            background: rgba(56, 139, 253, 0.08);
-            box-shadow: 0 0 0 1px var(--accent-blue);
+        .ct-proto-card.active {
+            border-color: var(--ct-blue);
+            background: rgba(0, 102, 204, 0.12);
         }
 
-        .proto-box h4 {
+        .ct-proto-card h4 {
             margin: 0 0 6px 0;
             font-size: 15px;
             font-weight: 600;
             color: #ffffff;
         }
 
-        .proto-box p {
+        .ct-proto-card p {
             margin: 0;
             font-size: 12px;
-            color: var(--text-muted);
+            color: var(--ct-text-muted);
             line-height: 1.4;
         }
 
         /* Form Layout */
-        .form-grid {
+        .ct-form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px 20px;
         }
 
-        .form-group {
+        .ct-form-group {
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
 
-        .form-group.full-width {
+        .ct-form-group.full-width {
             grid-column: span 2;
         }
 
-        .form-label {
+        .ct-label {
             font-size: 12.5px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: #d2d2d2;
         }
 
-        .form-input, .form-select {
-            background: var(--input-bg);
-            border: 1px solid var(--border-color);
+        .ct-input, .ct-select {
+            background: #151515;
+            border: 1px solid var(--ct-border);
             color: #ffffff;
             padding: 9px 12px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 13.5px;
             outline: none;
             transition: border-color 0.15s;
         }
 
-        .form-input:focus, .form-select:focus {
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 0 2px rgba(56, 139, 253, 0.2);
+        .ct-input:focus, .ct-select:focus {
+            border-color: var(--ct-blue);
+            box-shadow: 0 0 0 1px var(--ct-blue);
         }
 
         /* Badges */
-        .pill-badge {
+        .ct-badge {
             display: inline-flex;
             align-items: center;
-            padding: 3px 9px;
+            padding: 3px 10px;
             border-radius: 12px;
             font-size: 11.5px;
             font-weight: 600;
-            letter-spacing: 0.2px;
         }
 
-        .pill-success { background: rgba(35, 134, 54, 0.2); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.4); }
-        .pill-pending { background: rgba(210, 153, 34, 0.2); color: #e3b341; border: 1px solid rgba(227, 179, 65, 0.4); }
-        .pill-error   { background: rgba(218, 54, 51, 0.2); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.4); }
-        .pill-proto   { background: #262c38; color: #c9d1d9; border: 1px solid #3d4659; }
+        .ct-badge-success { background: rgba(62, 134, 53, 0.2); color: #5ba352; border: 1px solid rgba(62, 134, 53, 0.4); }
+        .ct-badge-pending { background: rgba(240, 171, 0, 0.2); color: #f0ab00; border: 1px solid rgba(240, 171, 0, 0.4); }
+        .ct-badge-error   { background: rgba(201, 25, 11, 0.2); color: #c9190b; border: 1px solid rgba(201, 25, 11, 0.4); }
+        .ct-badge-proto   { background: #2c3035; color: #f0f0f0; border: 1px solid #43484f; }
 
         /* Buttons */
-        .btn-modern {
-            background: #272d3a;
+        .ct-btn {
+            background: #363a3e;
             color: #ffffff;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--ct-border);
             padding: 7px 14px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
@@ -273,41 +258,41 @@
             transition: all 0.15s ease-in-out;
         }
 
-        .btn-modern:hover {
-            background: #343c4e;
-            border-color: #4a5468;
+        .ct-btn:hover {
+            background: #44494f;
+            border-color: #555b63;
         }
 
-        .btn-modern-primary {
-            background: var(--accent-green);
-            border-color: rgba(255, 255, 255, 0.1);
+        .ct-btn-primary {
+            background: var(--ct-green);
+            border-color: var(--ct-green);
         }
 
-        .btn-modern-primary:hover {
-            background: var(--accent-green-hover);
+        .ct-btn-primary:hover {
+            background: var(--ct-green-hover);
+            border-color: var(--ct-green-hover);
         }
 
-        .btn-modern-danger {
-            background: rgba(218, 54, 51, 0.15);
-            color: #ff7b72;
-            border-color: rgba(248, 81, 73, 0.3);
+        .ct-btn-danger {
+            background: rgba(201, 25, 11, 0.2);
+            color: #ff6b6b;
+            border-color: rgba(201, 25, 11, 0.4);
         }
 
-        .btn-modern-danger:hover {
-            background: var(--accent-red);
+        .ct-btn-danger:hover {
+            background: var(--ct-red);
             color: #ffffff;
         }
 
-        .btn-action-sm {
+        .ct-btn-sm {
             padding: 4px 10px;
             font-size: 12px;
-            font-weight: 500;
         }
 
-        /* Alert Banner */
-        .banner-alert {
+        /* Banner */
+        .ct-banner {
             padding: 12px 16px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 13.5px;
             margin-bottom: 18px;
             display: flex;
@@ -315,20 +300,20 @@
             gap: 10px;
         }
 
-        .banner-info    { background: rgba(56, 139, 253, 0.12); border: 1px solid rgba(56, 139, 253, 0.35); color: #79c0ff; }
-        .banner-success { background: rgba(35, 134, 54, 0.15); border: 1px solid rgba(63, 185, 80, 0.4); color: #56d364; }
-        .banner-error   { background: rgba(218, 54, 51, 0.15); border: 1px solid rgba(248, 81, 73, 0.4); color: #ff7b72; }
+        .ct-banner-info    { background: rgba(0, 102, 204, 0.15); border: 1px solid rgba(0, 102, 204, 0.4); color: #79c0ff; }
+        .ct-banner-success { background: rgba(62, 134, 53, 0.2); border: 1px solid rgba(62, 134, 53, 0.4); color: #56d364; }
+        .ct-banner-error   { background: rgba(201, 25, 11, 0.2); border: 1px solid rgba(201, 25, 11, 0.4); color: #ff7b72; }
 
         /* Terminal Console */
-        .terminal-box {
-            background: #0d1117;
-            border: 1px solid #272d3a;
-            border-radius: 6px;
+        .ct-terminal {
+            background: #0b0d0e;
+            border: 1px solid #2d3034;
+            border-radius: 4px;
             padding: 16px;
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-            font-size: 12.5px;
-            line-height: 1.6;
-            color: #56d364;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #38ef7d;
             height: 420px;
             overflow-y: auto;
             white-space: pre-wrap;
@@ -336,7 +321,7 @@
         }
 
         /* Modal */
-        .modal-wrap {
+        .ct-modal-wrap {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.75);
@@ -347,57 +332,57 @@
             z-index: 9999;
         }
 
-        .modal-panel {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+        .ct-modal-panel {
+            background: var(--ct-card-bg);
+            border: 1px solid var(--ct-border);
+            border-radius: 6px;
             width: 780px;
             max-width: 92vw;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-            padding: 22px;
+            padding: 24px;
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
+    <div class="ct-container">
         <!-- Page Header -->
-        <div class="page-header">
+        <div class="ct-header">
             <div>
-                <h1>🛡️ Central de Respaldos</h1>
-                <p>Gestión de copias de seguridad automatizadas multiplataforma con deduplicación por enlaces duros (*hardlinks*)</p>
+                <h1>🛡️ Copias de Seguridad (Backups)</h1>
+                <p>Gestión automatizada de respaldos multiplataforma con deduplicación por enlaces duros (*hardlinks*)</p>
             </div>
             <div>
-                <button class="btn-modern" onclick="cargarTareas()">
+                <button class="ct-btn" onclick="cargarTareas()">
                     🔄 Refrescar
                 </button>
             </div>
         </div>
 
         <!-- Navigation Tabs -->
-        <div class="nav-tabs">
-            <button class="nav-tab-item active" id="tab-btn-tasks" onclick="switchTab('tab-tasks', 'tab-btn-tasks')">
+        <div class="ct-tabs">
+            <button class="ct-tab-btn active" id="tab-btn-tasks" onclick="switchTab('tab-tasks', 'tab-btn-tasks')">
                 📋 Tareas Programadas
             </button>
-            <button class="nav-tab-item" id="tab-btn-new" onclick="switchTab('tab-new', 'tab-btn-new')">
+            <button class="ct-tab-btn" id="tab-btn-new" onclick="switchTab('tab-new', 'tab-btn-new')">
                 ➕ Nueva Tarea de Backup
             </button>
-            <button class="nav-tab-item" id="tab-btn-logs" onclick="switchTab('tab-logs', 'tab-btn-logs')">
+            <button class="ct-tab-btn" id="tab-btn-logs" onclick="switchTab('tab-logs', 'tab-btn-logs')">
                 📜 Visor de Logs
             </button>
         </div>
 
         <!-- TAB 1: Tareas Programadas -->
         <div id="tab-tasks" class="tab-pane">
-            <div class="app-card">
-                <div class="app-card-header">
-                    <h3 class="app-card-title">Tareas de Respaldo Activas</h3>
-                    <button class="btn-modern btn-modern-primary btn-action-sm" onclick="switchTab('tab-new', 'tab-btn-new')">
+            <div class="ct-card">
+                <div class="ct-card-header">
+                    <h3 class="ct-card-title">Tareas de Respaldo Activas</h3>
+                    <button class="ct-btn ct-btn-primary ct-btn-sm" onclick="switchTab('tab-new', 'tab-btn-new')">
                         + Nueva Tarea
                     </button>
                 </div>
                 <div style="overflow-x: auto;">
-                    <table class="data-table">
+                    <table class="ct-table">
                         <thead>
                             <tr>
                                 <th>Identificador</th>
@@ -413,7 +398,7 @@
                         </thead>
                         <tbody id="tasks-table-body">
                             <tr>
-                                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                <td colspan="9" style="text-align: center; color: var(--ct-text-muted); padding: 30px;">
                                     Cargando tareas de respaldo...
                                 </td>
                             </tr>
@@ -425,81 +410,81 @@
 
         <!-- TAB 2: Nueva Tarea de Backup -->
         <div id="tab-new" class="tab-pane" style="display: none;">
-            <div class="app-card">
-                <div class="app-card-header">
-                    <h3 class="app-card-title">Configurar Nueva Tarea de Copia de Seguridad</h3>
+            <div class="ct-card">
+                <div class="ct-card-header">
+                    <h3 class="ct-card-title">Configurar Nueva Tarea de Copia de Seguridad</h3>
                 </div>
-                <div class="app-card-body">
+                <div class="ct-card-body">
                     
-                    <label class="form-label" style="display: block; margin-bottom: 10px;">1. Selecciona el Tipo de Servidor u Origen:</label>
-                    <div class="proto-grid">
-                        <div class="proto-box active" id="card-cifs" onclick="selectProto('cifs')">
+                    <label class="ct-label" style="display: block; margin-bottom: 10px;">1. Selecciona el Tipo de Servidor u Origen:</label>
+                    <div class="ct-proto-grid">
+                        <div class="ct-proto-card active" id="card-cifs" onclick="selectProto('cifs')">
                             <h4>🪟 Windows / SMB (CIFS)</h4>
                             <p>Respaldo de carpetas compartidas en servidores Windows o NAS</p>
                         </div>
-                        <div class="proto-box" id="card-ssh" onclick="selectProto('ssh')">
+                        <div class="ct-proto-card" id="card-ssh" onclick="selectProto('ssh')">
                             <h4>🐧 Servidor Linux (SSH)</h4>
                             <p>Respaldo remoto por túnel seguro SSH y rsync</p>
                         </div>
-                        <div class="proto-box" id="card-local" onclick="selectProto('local')">
+                        <div class="ct-proto-card" id="card-local" onclick="selectProto('local')">
                             <h4>💻 Carpeta Local</h4>
                             <p>Respaldo de un directorio físico de este servidor</p>
                         </div>
                     </div>
 
-                    <div id="alert-test" class="banner-alert banner-info" style="display: none;"></div>
+                    <div id="alert-test" class="ct-banner ct-banner-info" style="display: none;"></div>
 
-                    <label class="form-label" style="display: block; margin-bottom: 12px; font-size: 14px;">2. Parámetros de Conexión y Retención:</label>
+                    <label class="ct-label" style="display: block; margin-bottom: 12px; font-size: 14px;">2. Parámetros de Conexión y Retención:</label>
                     
                     <form onsubmit="event.preventDefault();">
-                        <div class="form-grid">
-                            <div class="form-group full-width">
-                                <label class="form-label">Identificador Único de la Tarea:</label>
-                                <input class="form-input" type="text" id="task-id" placeholder="ej. srv_ad_contabilidad" required>
+                        <div class="ct-form-grid">
+                            <div class="ct-form-group full-width">
+                                <label class="ct-label">Identificador Único de la Tarea:</label>
+                                <input class="ct-input" type="text" id="task-id" placeholder="ej. srv_ad_contabilidad" required>
                             </div>
 
                             <!-- Campos CIFS / SSH -->
-                            <div class="form-group field-remote">
-                                <label class="form-label">Dirección IP o Nombre del Servidor:</label>
-                                <input class="form-input" type="text" id="task-ip" placeholder="ej. 10.10.1.50">
+                            <div class="ct-form-group field-remote">
+                                <label class="ct-label">Dirección IP o Nombre del Servidor:</label>
+                                <input class="ct-input" type="text" id="task-ip" placeholder="ej. 10.10.1.50">
                             </div>
 
-                            <div class="form-group field-cifs">
-                                <label class="form-label">Nombre del Recurso Compartido Windows:</label>
-                                <input class="form-input" type="text" id="task-share" placeholder="ej. Documentos o Contabilidad$">
+                            <div class="ct-form-group field-cifs">
+                                <label class="ct-label">Nombre del Recurso Compartido Windows:</label>
+                                <input class="ct-input" type="text" id="task-share" placeholder="ej. Documentos o Contabilidad$">
                             </div>
 
-                            <div class="form-group field-ssh" style="display: none;">
-                                <label class="form-label">Puerto SSH:</label>
-                                <input class="form-input" type="number" id="task-port" value="22">
+                            <div class="ct-form-group field-ssh" style="display: none;">
+                                <label class="ct-label">Puerto SSH:</label>
+                                <input class="ct-input" type="number" id="task-port" value="22">
                             </div>
 
-                            <div class="form-group field-ssh" style="display: none;">
-                                <label class="form-label">Ruta Remota en Servidor Linux:</label>
-                                <input class="form-input" type="text" id="task-remote-path" placeholder="ej. /var/www o /srv/datos">
+                            <div class="ct-form-group field-ssh" style="display: none;">
+                                <label class="ct-label">Ruta Remota en Servidor Linux:</label>
+                                <input class="ct-input" type="text" id="task-remote-path" placeholder="ej. /var/www o /srv/datos">
                             </div>
 
                             <!-- Campos Locales -->
-                            <div class="form-group full-width field-local" style="display: none;">
-                                <label class="form-label">Ruta Física Local a Respaldar:</label>
-                                <input class="form-input" type="text" id="task-local-path" value="/srv/nas/SISTEMAS">
+                            <div class="ct-form-group full-width field-local" style="display: none;">
+                                <label class="ct-label">Ruta Física Local a Respaldar:</label>
+                                <input class="ct-input" type="text" id="task-local-path" value="/srv/nas/SISTEMAS">
                             </div>
 
                             <!-- Credenciales -->
-                            <div class="form-group field-remote">
-                                <label class="form-label">Usuario con Acceso de Lectura:</label>
-                                <input class="form-input" type="text" id="task-user" placeholder="ej. Administrador o root">
+                            <div class="ct-form-group field-remote">
+                                <label class="ct-label">Usuario con Acceso de Lectura:</label>
+                                <input class="ct-input" type="text" id="task-user" placeholder="ej. Administrador o root">
                             </div>
 
-                            <div class="form-group field-remote">
-                                <label class="form-label">Contraseña:</label>
-                                <input class="form-input" type="password" id="task-password" placeholder="••••••••••••">
+                            <div class="ct-form-group field-remote">
+                                <label class="ct-label">Contraseña:</label>
+                                <input class="ct-input" type="password" id="task-password" placeholder="••••••••••••">
                             </div>
 
                             <!-- Programación y Retención -->
-                            <div class="form-group">
-                                <label class="form-label">Frecuencia de Ejecución Automática:</label>
-                                <select class="form-select" id="task-cron-select" onchange="handleCronSelect(this.value)">
+                            <div class="ct-form-group">
+                                <label class="ct-label">Frecuencia de Ejecución Automática:</label>
+                                <select class="ct-select" id="task-cron-select" onchange="handleCronSelect(this.value)">
                                     <option value="0 23 * * *">Diario a las 23:00 hrs (Recomendado)</option>
                                     <option value="0 */6 * * *">Cada 6 Horas</option>
                                     <option value="0 */12 * * *">Cada 12 Horas</option>
@@ -508,22 +493,22 @@
                                 </select>
                             </div>
 
-                            <div class="form-group" id="group-custom-cron" style="display: none;">
-                                <label class="form-label">Expresión Cron Personalizada:</label>
-                                <input class="form-input" type="text" id="task-cron" value="0 23 * * *">
+                            <div class="ct-form-group" id="group-custom-cron" style="display: none;">
+                                <label class="ct-label">Expresión Cron Personalizada:</label>
+                                <input class="ct-input" type="text" id="task-cron" value="0 23 * * *">
                             </div>
 
-                            <div class="form-group">
-                                <label class="form-label">Retención de Snapshots (Deduplicados):</label>
-                                <input class="form-input" type="number" id="task-retention" value="30" min="1" max="365">
+                            <div class="ct-form-group">
+                                <label class="ct-label">Retención de Snapshots (Deduplicados):</label>
+                                <input class="ct-input" type="number" id="task-retention" value="30" min="1" max="365">
                             </div>
                         </div>
 
                         <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-                            <button type="button" class="btn-modern field-remote" id="btn-test" onclick="probarConexion()">
+                            <button type="button" class="ct-btn field-remote" id="btn-test" onclick="probarConexion()">
                                 🔍 Probar Conexión en Vivo
                             </button>
-                            <button type="button" class="btn-modern btn-modern-primary" id="btn-save" onclick="guardarTarea()">
+                            <button type="button" class="ct-btn ct-btn-primary" id="btn-save" onclick="guardarTarea()">
                                 💾 Guardar y Programar Tarea
                             </button>
                         </div>
@@ -534,33 +519,33 @@
 
         <!-- TAB 3: Visor de Logs -->
         <div id="tab-logs" class="tab-pane" style="display: none;">
-            <div class="app-card">
-                <div class="app-card-header">
+            <div class="ct-card">
+                <div class="ct-card-header">
                     <div style="display: flex; gap: 12px; align-items: center;">
-                        <label class="form-label">Tarea a Consultar:</label>
-                        <select class="form-select" id="log-task-select" onchange="verLogs(this.value)" style="min-width: 250px;"></select>
+                        <label class="ct-label">Tarea a Consultar:</label>
+                        <select class="ct-select" id="log-task-select" onchange="verLogs(this.value)" style="min-width: 250px;"></select>
                     </div>
-                    <button class="btn-modern btn-action-sm" onclick="verLogs(document.getElementById('log-task-select').value)">
+                    <button class="ct-btn ct-btn-sm" onclick="verLogs(document.getElementById('log-task-select').value)">
                         🔄 Refrescar Logs
                     </button>
                 </div>
-                <div class="app-card-body">
-                    <div class="terminal-box" id="log-console">Selecciona una tarea para consultar su registro de actividad en vivo...</div>
+                <div class="ct-card-body">
+                    <div class="ct-terminal" id="log-console">Selecciona una tarea para consultar su registro de actividad en vivo...</div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modal para Logs -->
-    <div class="modal-wrap" id="modal-logs">
-        <div class="modal-panel">
+    <div class="ct-modal-wrap" id="modal-logs">
+        <div class="ct-modal-panel">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <h3 style="margin: 0; font-size: 16px;" id="modal-log-title">Registro de Actividad</h3>
-                <button class="btn-modern btn-action-sm" onclick="cerrarModal()">✕</button>
+                <h3 style="margin: 0; font-size: 16px; color: #ffffff;" id="modal-log-title">Registro de Actividad</h3>
+                <button class="ct-btn ct-btn-sm" onclick="cerrarModal()">✕</button>
             </div>
-            <div class="terminal-box" id="modal-log-console">Cargando registros...</div>
+            <div class="ct-terminal" id="modal-log-console">Cargando registros...</div>
             <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
-                <button class="btn-modern" onclick="cerrarModal()">Cerrar</button>
+                <button class="ct-btn" onclick="cerrarModal()">Cerrar</button>
             </div>
         </div>
     </div>
@@ -571,7 +556,7 @@
 
         function switchTab(paneId, btnId) {
             document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.nav-tab-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.ct-tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(paneId).style.display = 'block';
             document.getElementById(btnId).classList.add('active');
             if (paneId === 'tab-tasks') cargarTareas();
@@ -579,7 +564,7 @@
 
         function selectProto(proto) {
             currentProto = proto;
-            document.querySelectorAll('.proto-box').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.ct-proto-card').forEach(el => el.classList.remove('active'));
             document.getElementById('card-' + proto).classList.add('active');
 
             document.querySelectorAll('.field-cifs, .field-ssh, .field-local, .field-remote').forEach(el => el.style.display = 'none');
@@ -606,11 +591,11 @@
         function cargarTareas() {
             const tbody = document.getElementById('tasks-table-body');
             const selectLog = document.getElementById('log-task-select');
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Cargando...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--ct-text-muted); padding: 20px;">Cargando...</td></tr>';
 
             runApi(["list"]).then(res => {
                 if (res.status !== "ok" || !res.tasks || res.tasks.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">No hay tareas de backup programadas actualmente. Haz clic en "Nueva Tarea de Backup" para crear una.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--ct-text-muted); padding: 30px;">No hay tareas de backup programadas actualmente. Haz clic en "Nueva Tarea de Backup" para crear una.</td></tr>';
                     selectLog.innerHTML = '<option value="">(Sin tareas creadas)</option>';
                     return;
                 }
@@ -625,13 +610,13 @@
                     selectLog.appendChild(opt);
 
                     const tr = document.createElement('tr');
-                    let statusBadge = `<span class="pill-badge pill-pending">${t.last_status}</span>`;
-                    if (t.last_status === 'Éxito') statusBadge = `<span class="pill-badge pill-success">● Éxito</span>`;
-                    if (t.last_status === 'Fallo') statusBadge = `<span class="pill-badge pill-error">✕ Fallo</span>`;
+                    let statusBadge = `<span class="ct-badge ct-badge-pending">${t.last_status}</span>`;
+                    if (t.last_status === 'Éxito') statusBadge = `<span class="ct-badge ct-badge-success">● Éxito</span>`;
+                    if (t.last_status === 'Fallo') statusBadge = `<span class="ct-badge ct-badge-error">✕ Fallo</span>`;
 
                     tr.innerHTML = `
                         <td><strong>${t.id}</strong></td>
-                        <td><span class="pill-badge pill-proto">${t.proto}</span></td>
+                        <td><span class="ct-badge ct-badge-proto">${t.proto}</span></td>
                         <td><code style="color: #79c0ff;">${t.src}</code></td>
                         <td><code>${t.cron}</code></td>
                         <td>${t.retention} snaps</td>
@@ -639,9 +624,9 @@
                         <td>${t.last_run}</td>
                         <td>${statusBadge}</td>
                         <td style="text-align: right; white-space: nowrap;">
-                            <button class="btn-modern btn-action-sm" onclick="ejecutarAhora('${t.id}')" title="Ejecutar Backup Inmediatamente">⚡ Ejecutar</button>
-                            <button class="btn-modern btn-action-sm" onclick="abrirModalLogs('${t.id}')" title="Ver Historial de Logs">📄 Logs</button>
-                            <button class="btn-modern btn-modern-danger btn-action-sm" onclick="eliminarTarea('${t.id}')" title="Eliminar Tarea">🗑️</button>
+                            <button class="ct-btn ct-btn-sm" onclick="ejecutarAhora('${t.id}')" title="Ejecutar Backup Inmediatamente">⚡ Ejecutar</button>
+                            <button class="ct-btn ct-btn-sm" onclick="abrirModalLogs('${t.id}')" title="Ver Historial de Logs">📄 Logs</button>
+                            <button class="ct-btn ct-btn-danger ct-btn-sm" onclick="eliminarTarea('${t.id}')" title="Eliminar Tarea">🗑️</button>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -652,7 +637,7 @@
         function probarConexion() {
             const alertBox = document.getElementById('alert-test');
             alertBox.style.display = 'flex';
-            alertBox.className = 'banner-alert banner-info';
+            alertBox.className = 'ct-banner ct-banner-info';
             alertBox.textContent = '⏳ Probando conexión en vivo con el servidor remoto...';
 
             const payload = {
@@ -671,10 +656,10 @@
 
             runApi([action, JSON.stringify(payload)]).then(res => {
                 if (res.status === "ok") {
-                    alertBox.className = 'banner-alert banner-success';
+                    alertBox.className = 'ct-banner ct-banner-success';
                     alertBox.textContent = '✔ ' + res.message;
                 } else {
-                    alertBox.className = 'banner-alert banner-error';
+                    alertBox.className = 'ct-banner ct-banner-error';
                     alertBox.textContent = '✕ ' + res.message;
                 }
             });
