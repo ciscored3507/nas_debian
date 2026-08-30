@@ -432,33 +432,47 @@ for name, d in shares.items():
                     --inputbox "Descripción o comentario del recurso:" 10 65 "Carpeta compartida $NOMBRE_SHARE" 3>&1 1>&2 2>&3)
                 [ -z "$COMENTARIO" ] && COMENTARIO="Carpeta compartida $NOMBRE_SHARE"
 
-                TIPO_PERM=$(whiptail --title "Esquema de Seguridad" \
+                TIPO_PERM=$(whiptail --title "Esquema de Seguridad y Permisos" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-                    --menu "Selecciona el nivel de acceso para este recurso:" 14 68 3 \
-                    "1" "Lectura y Escritura para grupos específicos" \
-                    "2" "Solo Lectura General (Escritura exclusiva para TI)" \
-                    "3" "Acceso Público (Lectura y Escritura libre)" 3>&1 1>&2 2>&3)
+                    --menu "Selecciona el esquema de permisos para este recurso:" 16 72 4 \
+                    "1" "Lectura y Escritura (Todos los grupos autorizados pueden editar)" \
+                    "2" "Solo Lectura General + Escritura Exclusiva (write list)" \
+                    "3" "Solo Lectura Estricta (Nadie puede modificar desde la red)" \
+                    "4" "Acceso Público / Invitados (Sin contraseña)" 3>&1 1>&2 2>&3)
                 if [ $? -ne 0 ] || [ -z "$TIPO_PERM" ]; then continue; fi
 
                 GRUPO_DUENO="grp_sistemas"
-                VALID_USERS="@grp_sistemas"
+                VALID_USERS=""
                 WRITE_LIST=""
                 READ_ONLY="no"
                 GUEST_OK="no"
                 MASK="0770"
-                TIPO_TXT="Lectura y Escritura por Grupo"
+                TIPO_TXT=""
+
+                # Obtener grupos disponibles
+                GRUPOS_DISP=$(awk -F: '($3 >= 1000 || $1 ~ /^grp_/) && $1 !~ /^(nogroup|nobody)$/ {print $1}' /etc/group | sort -u)
 
                 case "$TIPO_PERM" in
                     1)
-                        GRUPOS_DISP=$(grep -E "^grp_" /etc/group | cut -d: -f1)
+                        # Lectura y Escritura por Grupos
+                        TIPO_TXT="Lectura y Escritura para Grupos Seleccionados"
+                        READ_ONLY="no"
+                        MASK="0770"
+
+                        if [ -z "$GRUPOS_DISP" ]; then
+                            whiptail --title "Sin Grupos" --ok-button "< Aceptar >" \
+                                --msgbox "No hay grupos de seguridad registrados en el sistema.\nCrea primero un grupo desde la opción [2]." 10 60
+                            continue
+                        fi
+
                         LISTA_OPCIONES=""
                         for g in $GRUPOS_DISP; do
                             LISTA_OPCIONES="$LISTA_OPCIONES $g $g OFF"
                         done
 
-                        GRUPOS_SELEC=$(whiptail --title "Grupos Autorizados" \
+                        GRUPOS_SELEC=$(whiptail --title "Grupos con Lectura y Escritura" \
                             --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
-                            --checklist "Marca con ESPACIO los grupos autorizados para este recurso:" 18 68 8 \
+                            --checklist "Marca con ESPACIO los grupos autorizados para lectura y escritura:" 18 70 8 \
                             $LISTA_OPCIONES 3>&1 1>&2 2>&3)
 
                         if [ -z "$GRUPOS_SELEC" ]; then
@@ -467,42 +481,147 @@ for name, d in shares.items():
                         fi
 
                         GRUPOS_LIMPIOS=$(echo "$GRUPOS_SELEC" | tr -d '\"')
-                        VALID_USERS="@grp_sistemas"
+                        V_LIST=""
                         for g in $GRUPOS_LIMPIOS; do
-                            VALID_USERS="$VALID_USERS, @$g"
+                            [ -z "$V_LIST" ] && V_LIST="@$g" || V_LIST="$V_LIST, @$g"
                             GRUPO_DUENO="$g"
                         done
+                        if grep -q "^grp_sistemas:" /etc/group && [[ "$V_LIST" != *"@grp_sistemas"* ]]; then
+                            V_LIST="@grp_sistemas, $V_LIST"
+                        fi
+                        VALID_USERS="$V_LIST"
                         ;;
+
                     2)
-                        TIPO_TXT="Solo Lectura (Escritura solo TI)"
-                        VALID_USERS="@grp_empleados_ead, @grp_sistemas"
-                        WRITE_LIST="@grp_sistemas"
+                        # Solo Lectura General + Escritura Exclusiva (write list)
+                        TIPO_TXT="Solo Lectura General con Escritura Exclusiva (write list)"
                         READ_ONLY="yes"
                         MASK="0775"
+
+                        if [ -z "$GRUPOS_DISP" ]; then
+                            whiptail --title "Sin Grupos" --ok-button "< Aceptar >" \
+                                --msgbox "No hay grupos registrados. Crea un grupo primero en la opción [2]." 10 60
+                            continue
+                        fi
+
+                        LISTA_OPC_R=""
+                        for g in $GRUPOS_DISP; do
+                            LISTA_OPC_R="$LISTA_OPC_R $g $g OFF"
+                        done
+
+                        # Paso A: Grupos con acceso de lectura
+                        GRUPOS_R=$(whiptail --title "Grupos con Acceso de Lectura" \
+                            --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
+                            --checklist "Marca con ESPACIO los grupos que podrán ver y descargar archivos:" 18 70 8 \
+                            $LISTA_OPC_R 3>&1 1>&2 2>&3)
+
+                        if [ -z "$GRUPOS_R" ]; then
+                            whiptail --ok-button "< Aceptar >" --msgbox "Debes seleccionar al menos un grupo de lectura." 8 45
+                            continue
+                        fi
+
+                        # Paso B: Grupo con permiso exclusivo de escritura
+                        LISTA_OPC_W=""
+                        for g in $GRUPOS_DISP; do
+                            LISTA_OPC_W="$LISTA_OPC_W $g Grupo_$g"
+                        done
+
+                        GRUPO_W=$(whiptail --title "Grupo con Permiso de ESCRITURA" \
+                            --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
+                            --menu "Selecciona el grupo único que podrá SUBIR, EDITAR y BORRAR archivos:" 18 70 8 \
+                            $LISTA_OPC_W 3>&1 1>&2 2>&3)
+
+                        if [ -z "$GRUPO_W" ]; then continue; fi
+
+                        GRUPOS_R_CLEAN=$(echo "$GRUPOS_R" | tr -d '\"')
+                        V_LIST=""
+                        for g in $GRUPOS_R_CLEAN; do
+                            [ -z "$V_LIST" ] && V_LIST="@$g" || V_LIST="$V_LIST, @$g"
+                        done
+                        if [[ "$V_LIST" != *"@$GRUPO_W"* ]]; then
+                            V_LIST="$V_LIST, @$GRUPO_W"
+                        fi
+
+                        VALID_USERS="$V_LIST"
+                        WRITE_LIST="@$GRUPO_W"
+                        GRUPO_DUENO="$GRUPO_W"
                         ;;
+
                     3)
-                        TIPO_TXT="Acceso Público Abierto"
+                        # Solo Lectura Estricta
+                        TIPO_TXT="Solo Lectura Estricta (Nadie puede modificar desde la red)"
+                        READ_ONLY="yes"
+                        MASK="0755"
+
+                        LISTA_OPCIONES=""
+                        for g in $GRUPOS_DISP; do
+                            LISTA_OPCIONES="$LISTA_OPCIONES $g $g OFF"
+                        done
+
+                        GRUPOS_SELEC=$(whiptail --title "Grupos Autorizados para Lectura" \
+                            --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
+                            --checklist "Marca los grupos que tendrán acceso de solo lectura:" 18 70 8 \
+                            $LISTA_OPCIONES 3>&1 1>&2 2>&3)
+
+                        if [ -z "$GRUPOS_SELEC" ]; then
+                            whiptail --ok-button "< Aceptar >" --msgbox "Debes seleccionar al menos un grupo." 8 45
+                            continue
+                        fi
+
+                        GRUPOS_LIMPIOS=$(echo "$GRUPOS_SELEC" | tr -d '\"')
+                        V_LIST=""
+                        for g in $GRUPOS_LIMPIOS; do
+                            [ -z "$V_LIST" ] && V_LIST="@$g" || V_LIST="$V_LIST, @$g"
+                            GRUPO_DUENO="$g"
+                        done
+                        VALID_USERS="$V_LIST"
+                        ;;
+
+                    4)
+                        # Acceso Público / Invitados
+                        OPC_PUB=$(whiptail --title "Acceso Público (Invitados)" \
+                            --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                            --menu "Selecciona el nivel de acceso para usuarios sin credenciales:" 14 68 2 \
+                            "1" "Solo Lectura (Invitados solo ven y descargan)" \
+                            "2" "Lectura y Escritura Total (Invitados pueden subir y borrar)" 3>&1 1>&2 2>&3)
+                        if [ $? -ne 0 ] || [ -z "$OPC_PUB" ]; then continue; fi
+
                         GUEST_OK="yes"
-                        READ_ONLY="no"
-                        MASK="0777"
                         VALID_USERS=""
+                        if [ "$OPC_PUB" == "1" ]; then
+                            TIPO_TXT="Acceso Público (Solo Lectura)"
+                            READ_ONLY="yes"
+                            MASK="0755"
+                        else
+                            TIPO_TXT="Acceso Público (Lectura y Escritura Libre)"
+                            READ_ONLY="no"
+                            MASK="0777"
+                        fi
                         ;;
                 esac
 
                 if (whiptail --title "Confirmar Creación de Recurso" \
                     --yes-button "< Sí, Crear Recurso >" --no-button "< Cancelar >" \
-                    --yesno "¿Confirmas la creación del recurso con los siguientes parámetros?\n\n• Nombre:   [$NOMBRE_SHARE]\n• Ruta:     $RUTA_SHARE\n• Tipo:     $TIPO_TXT\n• Acceso:   ${VALID_USERS:-Todos}" 13 68); then
+                    --yesno "¿Confirmas la creación del recurso con los siguientes parámetros?\n\n• Nombre:   [$NOMBRE_SHARE]\n• Ruta:     $RUTA_SHARE\n• Tipo:     $TIPO_TXT\n• Acceso:   ${VALID_USERS:-Invitados (Público)}\n• Escritura: ${WRITE_LIST:-Según Permisos Generales}" 15 70); then
                     
                     mkdir -p "$RUTA_SHARE"
                     if [ "$TIPO_PERM" == "1" ]; then
                         chown -R root:"$GRUPO_DUENO" "$RUTA_SHARE"
                         chmod -R 2770 "$RUTA_SHARE"
                     elif [ "$TIPO_PERM" == "2" ]; then
-                        chown -R root:grp_sistemas "$RUTA_SHARE"
+                        chown -R root:"$GRUPO_DUENO" "$RUTA_SHARE"
                         chmod -R 2775 "$RUTA_SHARE"
                     elif [ "$TIPO_PERM" == "3" ]; then
-                        chown -R nobody:nogroup "$RUTA_SHARE"
-                        chmod -R 0777 "$RUTA_SHARE"
+                        chown -R root:"$GRUPO_DUENO" "$RUTA_SHARE"
+                        chmod -R 2755 "$RUTA_SHARE"
+                    elif [ "$TIPO_PERM" == "4" ]; then
+                        if [ "$OPC_PUB" == "1" ]; then
+                            chown -R nobody:nogroup "$RUTA_SHARE"
+                            chmod -R 0755 "$RUTA_SHARE"
+                        else
+                            chown -R nobody:nogroup "$RUTA_SHARE"
+                            chmod -R 0777 "$RUTA_SHARE"
+                        fi
                     fi
 
                     cat << SMBCONF >> /etc/samba/smb.conf
@@ -523,10 +642,10 @@ $([ -n "$WRITE_LIST" ] && echo "   write list = $WRITE_LIST")
    force create mode = $MASK
    force directory mode = $MASK
 SMBCONF
-                    testparm -s &>/dev/null
-                    smbcontrol all reload-config 2>/dev/null || systemctl reload smbd
+                    testparm -s &>/dev/null || true
+                    smbcontrol all reload-config 2>/dev/null || systemctl reload smbd 2>/dev/null || systemctl restart smbd 2>/dev/null || true
                     whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
-                        --msgbox "✔ ¡Recurso \"[$NOMBRE_SHARE]\" creado con éxito!\n\nRuta: $RUTA_SHARE\n\nAccesible desde Windows en: \\\\${SERVER_IP}\\$NOMBRE_SHARE" 12 70
+                        --msgbox "✔ ¡Recurso \"[$NOMBRE_SHARE]\" creado con éxito!\n\n• Ruta:      $RUTA_SHARE\n• Esquema:   $TIPO_TXT\n\nAccesible desde Windows en: \\\\${SERVER_IP}\\$NOMBRE_SHARE" 13 70
                 fi
                 ;;
 
@@ -1074,25 +1193,48 @@ crear_usuario_guiado() {
         return
     fi
 
-    ROL=$(whiptail --title "Perfil Jerárquico" \
+    PERFIL=$(whiptail --title "Tipo de Usuario" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-        --menu "Selecciona el perfil de acceso del empleado:" 16 68 5 \
-        "SISTEMAS" "Acceso Total a todo el NAS y Backups (TI)" \
-        "ADMINISTRATIVO" "Gestión y Supervisión de Campaña" \
-        "ANALISTA" "Acceso a Admin y Analistas (Bloqueado de Asesores)" \
-        "ASESOR" "Acceso exclusivo a Asesores" \
-        "BACKUP" "Usuario exclusivo de almacenamiento de Backups" 3>&1 1>&2 2>&3)
-    if [ $? -ne 0 ] || [ -z "$ROL" ]; then return; fi
+        --menu "Selecciona el perfil de acceso para $USER_NAME:" 15 68 3 \
+        "1" "Administrador TI / Sistemas (Acceso Total a recursos)" \
+        "2" "Usuario Departamental (Seleccionar grupos de trabajo)" \
+        "3" "Usuario de Backup (Exclusivo para tareas de respaldo)" 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$PERFIL" ]; then return; fi
 
-    CAMPANA=""
-    if [ "$ROL" != "SISTEMAS" ] && [ "$ROL" != "BACKUP" ]; then
-        CAMPANA=$(whiptail --title "Asignación de Campaña" \
-            --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-            --menu "Selecciona la campaña del empleado:" 12 60 2 \
-            "C1" "CAMPAÑA UNO" \
-            "C2" "CAMPAÑA DOS" 3>&1 1>&2 2>&3)
-        if [ $? -ne 0 ] || [ -z "$CAMPANA" ]; then return; fi
-    fi
+    GRUPO_FINAL=""
+    case "$PERFIL" in
+        1)
+            GRUPO_FINAL="grp_sistemas,grp_backups"
+            ;;
+        2)
+            GRUPOS_DISP=$(awk -F: '($3 >= 1000 || $1 ~ /^grp_/) && $1 !~ /^(nogroup|nobody)$/ {print $1}' /etc/group | sort -u)
+            if [ -z "$GRUPOS_DISP" ]; then
+                whiptail --title "Sin Grupos" --ok-button "< Aceptar >" \
+                    --msgbox "No hay grupos de seguridad disponibles.\nCrea primero un grupo desde la opción [2] del menú principal." 10 65
+                return
+            fi
+
+            LISTA_OPCIONES=""
+            for g in $GRUPOS_DISP; do
+                LISTA_OPCIONES="$LISTA_OPCIONES $g $g OFF"
+            done
+
+            GRUPOS_SELEC=$(whiptail --title "Asignación de Grupos" \
+                --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
+                --checklist "Marca con ESPACIO los grupos a los que pertenecerá $USER_NAME:" 18 68 8 \
+                $LISTA_OPCIONES 3>&1 1>&2 2>&3)
+
+            if [ -z "$GRUPOS_SELEC" ]; then
+                whiptail --ok-button "< Aceptar >" --msgbox "Debes seleccionar al menos un grupo." 8 45
+                return
+            fi
+
+            GRUPO_FINAL=$(echo "$GRUPOS_SELEC" | tr -d '\"' | tr ' ' ',')
+            ;;
+        3)
+            GRUPO_FINAL="grp_backups"
+            ;;
+    esac
 
     USER_PW=$(whiptail --title "$APP_TITLE" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
@@ -1102,34 +1244,24 @@ crear_usuario_guiado() {
         return
     fi
 
-    GRUPO_FINAL="grp_empleados_ead"
-    if [ "$ROL" == "SISTEMAS" ]; then
-        GRUPO_FINAL="grp_empleados_ead,grp_sistemas,grp_backups"
-    elif [ "$ROL" == "BACKUP" ]; then
-        GRUPO_FINAL="grp_backups"
-    elif [ "$CAMPANA" == "C1" ]; then
-        if [ "$ROL" == "ADMINISTRATIVO" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c1_admin"; fi
-        if [ "$ROL" == "ANALISTA" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c1_analista"; fi
-        if [ "$ROL" == "ASESOR" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c1_asesor"; fi
-    elif [ "$CAMPANA" == "C2" ]; then
-        if [ "$ROL" == "ADMINISTRATIVO" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c2_admin"; fi
-        if [ "$ROL" == "ANALISTA" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c2_analista"; fi
-        if [ "$ROL" == "ASESOR" ]; then GRUPO_FINAL="grp_empleados_ead,grp_c2_asesor"; fi
-    fi
-
     if (whiptail --title "Confirmar Registro de Usuario" \
         --yes-button "< Sí, Registrar Usuario >" --no-button "< Cancelar >" \
-        --yesno "¿Confirmas el registro con los siguientes datos?\n\n• Usuario:  $USER_NAME\n• Perfil:   $ROL\n• Campaña:  ${CAMPANA:-Global}\n• Grupos:   $GRUPO_FINAL" 13 65); then
+        --yesno "¿Confirmas el registro con los siguientes datos?\n\n• Usuario:  $USER_NAME\n• Grupos:   $GRUPO_FINAL" 12 65); then
         
         if ! id "$USER_NAME" &>/dev/null; then
             adduser --disabled-password --gecos "" --no-create-home --shell /usr/sbin/nologin "$USER_NAME"
         fi
 
+        IFS=',' read -ra GRPS <<< "$GRUPO_FINAL"
+        for g in "${GRPS[@]}"; do
+            groupadd -f "$g"
+        done
+
         usermod -aG "$GRUPO_FINAL" "$USER_NAME"
         echo -e "${USER_PW}\n${USER_PW}" | smbpasswd -a -s "$USER_NAME"
 
         whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
-            --msgbox "✔ ¡Usuario Registrado con Éxito!\n\n• Usuario:  $USER_NAME\n• Perfil:   $ROL\n• Campaña:  ${CAMPANA:-Global}\n• Grupos:   $GRUPO_FINAL\n\nYa puede acceder desde la red a: \\\\${SERVER_IP}" 14 65
+            --msgbox "✔ ¡Usuario Registrado con Éxito!\n\n• Usuario:  $USER_NAME\n• Grupos:   $GRUPO_FINAL\n\nYa puede acceder desde la red a: \\\\${SERVER_IP}" 13 65
     fi
 }
 
@@ -1157,16 +1289,29 @@ diagnostico_nas() {
     df -h /srv/nas 2>/dev/null | awk 'NR==2 {printf "     Capacidad Total: %s | Utilizado: %s (%s) | Libre: %s\n", $2, $3, $5, $4}'
 
     echo -e "\n  ${C_BOLD}${C_WHITE}3. RECURSOS COMPARTIDOS EN SAMBA:${C_RESET}"
-    grep -E "^\[" /etc/samba/smb.conf | grep -v "global" | tr -d "[]" | while read -r r; do
-        echo -e "     [•] ${C_YELLOW}$r${C_RESET}"
-    done
+    if [ -f /etc/samba/smb.conf ]; then
+        local found_share=false
+        while read -r r; do
+            [ -n "$r" ] && found_share=true && echo -e "     [•] ${C_YELLOW}$r${C_RESET}"
+        done < <(grep -E "^\[" /etc/samba/smb.conf | grep -v "global" | tr -d "[]")
+        if [ "$found_share" = false ]; then
+            echo -e "     ${C_GRAY}(No hay recursos compartidos configurados todavía)${C_RESET}"
+        fi
+    else
+        echo -e "     ${C_GRAY}(Samba aún no ha sido instalado o configurado)${C_RESET}"
+    fi
 
     echo -e "\n  ${C_BOLD}${C_WHITE}4. TAREAS DE BACKUP PROGRAMADAS:${C_RESET}"
+    local has_bkp=false
     for b in /etc/cron.d/backup_*; do
         if [ -f "$b" ]; then
+            has_bkp=true
             echo -e "     [⏱] ${C_CYAN}$(basename "$b" | sed "s/backup_//"):${C_RESET} ${C_WHITE}$(cat "$b")${C_RESET}"
         fi
     done
+    if [ "$has_bkp" = false ]; then
+        echo -e "     ${C_GRAY}(No hay tareas de backup programadas)${C_RESET}"
+    fi
 
     echo -e "\n  ${C_GRAY}──────────────────────────────────────────────────────────────────────────${C_RESET}"
     read -n 1 -s -r -p "  Presiona cualquier tecla para regresar al menú principal..."
@@ -1197,7 +1342,7 @@ while true; do
         "2" "[2]  Gestión de Grupos de Seguridad (Crear / Listar / Eliminar)" \
         "3" "[3]  Gestión de Recursos Compartidos (Ver / Crear / Deshabilitar / Borrar)" \
         "4" "[4]  Gestión de Tareas de Backup (Windows / Linux / Local)" \
-        "5" "[5]  Gestión de Usuarios / Empleados (Crear Rol, Campaña y Clave)" \
+        "5" "[5]  Gestión de Usuarios / Empleados (Crear Usuario, Grupos y Clave)" \
         "6" "[6]  Ver Diagnóstico, Discos y Recursos Compartidos" \
         "7" "[7]  Reiniciar Servicios de Red (Samba / Cockpit)" \
         "8" "[8]  Desinstalar y Limpiar Servidor" 3>&1 1>&2 2>&3)

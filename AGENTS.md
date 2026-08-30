@@ -57,13 +57,15 @@ Carpetas Visibles:            Grupos:         Carpetas Ocultas ($):         Grup
 [CAMPANA_DOS_*]               grp_c1_*, c2_*  [BACKUPS_SERVIDORES$]         (Cero empleados)
 ```
 
-### A. Rol `ARCHIVOS` (NAS Departamental):
-* **Grupos Creados:** `grp_sistemas`, `grp_empleados_ead`, `grp_c1_admin`, `grp_c1_analista`, `grp_c1_asesor`, `grp_c2_admin`, `grp_c2_analista`, `grp_c2_asesor`.
-* **Permisos:**
-  * `[SISTEMAS]`: TI tiene lectura/escritura (`2770`), resto solo lectura (`2775`).
-  * `[CAMPANA_UNO_ADMINISTRATIVO]`: TI + Administrativos.
-  * `[CAMPANA_UNO_ANALISTAS]`: TI + Administrativos + Analistas (Asesores bloqueados).
-  * `[CAMPANA_UNO_ASESORES]`: TI + Administrativos + Analistas + Asesores.
+### A. Rol `ARCHIVOS` (Servidor NAS Modular y Limpio):
+* **Despliegue Base Limpio:** Despliega la infraestructura base (Discos, Samba, WSDD2, Cockpit, UFW) con grupos base de administración (`grp_sistemas`, `grp_backups`) y deja el archivo `smb.conf` preparado para crear recursos personalizados sin residuos.
+* **Gestión Dinámica de Grupos y Recursos desde el Asistente:**
+  * **Grupos Libres:** Creación de cualquier grupo (`grp_ventas`, `grp_contabilidad`, etc.).
+  * **4 Esquemas de Permisos Granulares:**
+    1. *Lectura y Escritura por Grupo:* Todos los grupos autorizados (`read only = no`, `mask 0770`).
+    2. *Solo Lectura General + Escritura Exclusiva:* Acceso general de lectura con permiso de escritura reservado a un grupo específico (`read only = yes`, `write list = @grupo_escritura`, `mask 0775`).
+    3. *Solo Lectura Estricta:* Consulta histórica sin modificación (`read only = yes`, `mask 0755`).
+    4. *Acceso Público / Invitados:* Libre acceso con o sin contraseña (`guest ok = yes`).
 
 ### B. Rol `BACKUP` (Central de Respaldos 100% Oculto e Inmune a Ransomware):
 * **Grupos Creados:** Únicamente `grp_sistemas` y `grp_backups`.

@@ -151,33 +151,15 @@ ExecStart=/usr/sbin/wsdd2 \$WSDD2_OPTS
 WSDDOVERRIDE
 
 echo " [4/9] Creando grupos y configurando Administrador ($ADMIN_USER)..."
-if [ "$SERVER_ROLE" == "BACKUP" ]; then
-    # El servidor de backup SOLO contiene grupos técnicos de administración
-    groupadd -f grp_sistemas
-    groupadd -f grp_backups
-else
-    # El servidor NAS contiene grupos departamentales
-    groupadd -f grp_empleados_ead
-    groupadd -f grp_sistemas
-    groupadd -f grp_c1_admin
-    groupadd -f grp_c1_analista
-    groupadd -f grp_c1_asesor
-    groupadd -f grp_c2_admin
-    groupadd -f grp_c2_analista
-    groupadd -f grp_c2_asesor
-    groupadd -f grp_backups
-fi
+# Grupos base de administración del sistema
+groupadd -f grp_sistemas
+groupadd -f grp_backups
 
 if ! id "$ADMIN_USER" &>/dev/null; then
     adduser --disabled-password --gecos "" "$ADMIN_USER"
 fi
 
-if [ "$SERVER_ROLE" == "BACKUP" ]; then
-    usermod -aG sudo,adm,grp_sistemas,grp_backups "$ADMIN_USER"
-else
-    usermod -aG sudo,adm,grp_empleados_ead,grp_sistemas,grp_backups "$ADMIN_USER"
-fi
-
+usermod -aG sudo,adm,grp_sistemas,grp_backups "$ADMIN_USER"
 echo "$ADMIN_USER ALL=(ALL:ALL) ALL" > "/etc/sudoers.d/$ADMIN_USER"
 chmod 0440 "/etc/sudoers.d/$ADMIN_USER"
 
@@ -200,21 +182,10 @@ if [ "$SERVER_ROLE" == "BACKUP" ]; then
     chown -R root:grp_sistemas /srv/nas/SNAPSHOTS_NAS && chmod -R 2770 /srv/nas/SNAPSHOTS_NAS
     chown -R root:grp_sistemas /srv/nas/LOGS_BACKUP && chmod -R 2775 /srv/nas/LOGS_BACKUP
 else
-    mkdir -p /srv/nas/SISTEMAS
-    mkdir -p /srv/nas/CAMPANA_UNO/Administrativo
-    mkdir -p /srv/nas/CAMPANA_UNO/Analistas
-    mkdir -p /srv/nas/CAMPANA_UNO/Asesores
-    mkdir -p /srv/nas/CAMPANA_DOS/Administrativo
-    mkdir -p /srv/nas/CAMPANA_DOS/Analistas
-    mkdir -p /srv/nas/CAMPANA_DOS/Asesores
-
-    chown -R root:grp_sistemas /srv/nas/SISTEMAS && chmod -R 2775 /srv/nas/SISTEMAS
-    chown -R root:grp_c1_admin /srv/nas/CAMPANA_UNO/Administrativo && chmod -R 2770 /srv/nas/CAMPANA_UNO/Administrativo
-    chown -R root:grp_c1_analista /srv/nas/CAMPANA_UNO/Analistas && chmod -R 2770 /srv/nas/CAMPANA_UNO/Analistas
-    chown -R root:grp_c1_asesor /srv/nas/CAMPANA_UNO/Asesores && chmod -R 2770 /srv/nas/CAMPANA_UNO/Asesores
-    chown -R root:grp_c2_admin /srv/nas/CAMPANA_DOS/Administrativo && chmod -R 2770 /srv/nas/CAMPANA_DOS/Administrativo
-    chown -R root:grp_c2_analista /srv/nas/CAMPANA_DOS/Analistas && chmod -R 2770 /srv/nas/CAMPANA_DOS/Analistas
-    chown -R root:grp_c2_asesor /srv/nas/CAMPANA_DOS/Asesores && chmod -R 2770 /srv/nas/CAMPANA_DOS/Asesores
+    # Servidor NAS: Directorio raíz base limpio preparado para recursos personalizados
+    mkdir -p /srv/nas
+    chown root:grp_sistemas /srv/nas
+    chmod 2775 /srv/nas
 fi
 
 echo " [6/9] Configurando /etc/samba/smb.conf para rol $SERVER_ROLE..."
@@ -222,7 +193,7 @@ if [ "$SERVER_ROLE" == "BACKUP" ]; then
 cat << SMBCONF > /etc/samba/smb.conf
 [global]
    workgroup = $SMB_WORKGROUP
-   server string = Servidor Central de Respaldos (Backup) EAD-COL
+   server string = Servidor Central de Respaldos (Backup) $SMB_WORKGROUP
    server role = standalone server
    netbios name = $SMB_NETBIOS
    security = user
@@ -287,84 +258,6 @@ cat << SMBCONF > /etc/samba/smb.conf
    log file = /var/log/samba/log.%m
    max log size = 1000
    logging = file
-
-[SISTEMAS]
-   comment = Software y Herramientas de Sistemas
-   path = /srv/nas/SISTEMAS
-   browseable = yes
-   read only = yes
-   write list = @grp_sistemas
-   valid users = @grp_empleados_ead, @grp_sistemas
-   create mask = 0775
-   directory mask = 0775
-   force create mode = 0775
-   force directory mode = 0775
-
-[C1_ADMINISTRATIVO]
-   comment = Campaña 1 - Area Administrativa
-   path = /srv/nas/CAMPANA_UNO/Administrativo
-   browseable = yes
-   read only = no
-   valid users = @grp_sistemas, @grp_c1_admin, @grp_c1_analista
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-
-[C1_ANALISTAS]
-   comment = Campaña 1 - Area de Analistas
-   path = /srv/nas/CAMPANA_UNO/Analistas
-   browseable = yes
-   read only = no
-   valid users = @grp_sistemas, @grp_c1_admin, @grp_c1_analista
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-
-[C1_ASESORES]
-   comment = Campaña 1 - Area de Asesores
-   path = /srv/nas/CAMPANA_UNO/Asesores
-   browseable = yes
-   read only = no
-   valid users = @grp_sistemas, @grp_c1_admin, @grp_c1_asesor
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-
-[C2_ADMINISTRATIVO]
-   comment = Campaña 2 - Area Administrativa
-   path = /srv/nas/CAMPANA_DOS/Administrativo
-   browseable = yes
-   read only = no
-   valid users = @grp_sistemas, @grp_c2_admin, @grp_c2_analista
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-
-[C2_ANALISTAS]
-   comment = Campaña 2 - Area de Analistas
-   path = /srv/nas/CAMPANA_DOS/Analistas
-   browseable = yes
-   read only = no
-   valid users = @grp_sistemas, @grp_c2_admin, @grp_c2_analista
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
-
-[C2_ASESORES]
-   comment = Campaña 2 - Area de Asesores
-   path = /srv/nas/CAMPANA_DOS/Asesores
-   browseable = yes
-   read only = no
-   valid users = @grp_sistemas, @grp_c2_admin, @grp_c2_asesor
-   create mask = 0770
-   directory mask = 0770
-   force create mode = 0770
-   force directory mode = 0770
 SMBCONF
 fi
 

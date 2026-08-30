@@ -39,7 +39,7 @@ rm -f /usr/local/bin/chage /usr/local/bin/passwd /usr/local/bin/lastb /usr/bin/l
 rm -rf /usr/share/cockpit/file-sharing /usr/share/cockpit/identities /usr/share/cockpit/navigator
 
 echo "[5/6] Eliminando grupos creados..."
-for grp in grp_empleados_ead grp_sistemas grp_c1_admin grp_c1_analista grp_c1_asesor grp_c2_admin grp_c2_analista grp_c2_asesor grp_backups; do
+for grp in $(grep -E '^grp_' /etc/group | cut -d: -f1); do
     groupdel "$grp" 2>/dev/null || true
 done
 
