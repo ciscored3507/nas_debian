@@ -5,7 +5,7 @@
     },
     "menu": {
         "index": {
-            "label": "Backups (EAD)",
+            "label": "Backups",
             "order": 115
         }
     }
