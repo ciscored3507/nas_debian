@@ -57,21 +57,29 @@ obtener_usuario_defecto() {
 obtener_netbios_defecto() {
     local rol="$1"
     local cur_host
+    if command -v testparm &>/dev/null && [ -f /etc/samba/smb.conf ]; then
+        local smb_name
+        smb_name=$(testparm -s --parameter-name="netbios name" 2>/dev/null || true)
+        if [ -n "$smb_name" ] && [ "$smb_name" != "NONE" ]; then
+            echo "$smb_name"
+            return
+        fi
+    fi
     cur_host=$(hostname -s 2>/dev/null | tr 'a-z' 'A-Z')
-    if [ -n "$cur_host" ] && [ "$cur_host" != "DEBIAN" ] && [ "$cur_host" != "LOCALHOST" ]; then
+    if [ -n "$cur_host" ]; then
         echo "$cur_host"
     else
         [ "$rol" == "BACKUP" ] && echo "SRV-EAD-BKP" || echo "SRV-EAD-NAS"
     fi
 }
 
-# Obtener grupo de trabajo Samba por defecto
+# Obtener grupo de trabajo Samba o Dominio por defecto
 obtener_workgroup_defecto() {
     local wg=""
     if command -v testparm &>/dev/null && [ -f /etc/samba/smb.conf ]; then
         wg=$(testparm -s --parameter-name=workgroup 2>/dev/null || true)
     fi
-    [ -z "$wg" ] && wg="EAD-COL"
+    [ -z "$wg" ] && wg="WORKGROUP"
     echo "$wg"
 }
 
@@ -209,14 +217,14 @@ for item in final_items:
         fi
     fi
 
-    SMB_NETBIOS=$(whiptail --title "Paso 3 de 5: Nombre del Servidor" \
+    SMB_NETBIOS=$(whiptail --title "Paso 3 de 5: Nombre del Servidor (NetBIOS)" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --inputbox "Ingresa el nombre de red NetBIOS para este servidor:" 10 65 "$DEFAULT_NETBIOS" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$SMB_NETBIOS" ]; then return; fi
 
-    SMB_WORKGROUP=$(whiptail --title "Paso 3 de 5: Grupo de Trabajo" \
+    SMB_WORKGROUP=$(whiptail --title "Paso 3 de 5: Grupo de Trabajo / Dominio" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-        --inputbox "Ingresa el nombre del Grupo de Trabajo (Workgroup):" 10 65 "$DEFAULT_WORKGROUP" 3>&1 1>&2 2>&3)
+        --inputbox "Ingresa el Grupo de Trabajo (Workgroup) o Dominio NetBIOS:" 10 68 "$DEFAULT_WORKGROUP" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$SMB_WORKGROUP" ]; then return; fi
 
     USUARIO_ACTUAL="$DEFAULT_USER"
@@ -232,25 +240,35 @@ for item in final_items:
     if [ "$OPCION_USER" == "2" ]; then
         ADMIN_USER=$(whiptail --title "Nuevo Administrador" \
             --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-            --inputbox "Ingresa el nombre de usuario para el administrador de Cockpit:" 10 65 "admin_nas" 3>&1 1>&2 2>&3)
+            --inputbox "Ingresa el nombre de usuario para el nuevo administrador:" 10 65 "admin_nas" 3>&1 1>&2 2>&3)
         if [ $? -ne 0 ] || [ -z "$ADMIN_USER" ]; then return; fi
+
+        while true; do
+            ADMIN_PASS=$(whiptail --title "Contraseña de Administrador" \
+                --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+                --passwordbox "Ingresa la contraseña obligatoria para el nuevo usuario $ADMIN_USER:" 10 65 3>&1 1>&2 2>&3)
+            if [ $? -ne 0 ]; then return; fi
+            if [ -n "$ADMIN_PASS" ]; then break; fi
+            whiptail --title "Error" --ok-button "< Aceptar >" --msgbox "La contraseña para un nuevo usuario no puede estar vacía." 8 50
+        done
+    else
+        ADMIN_PASS=$(whiptail --title "Contraseña de Administrador (Opcional)" \
+            --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
+            --passwordbox "Contraseña para $ADMIN_USER (Deja en blanco para conservar la clave actual de Linux/Samba):" 10 72 3>&1 1>&2 2>&3)
+        if [ $? -ne 0 ]; then return; fi
     fi
 
-    ADMIN_PASS=$(whiptail --title "Contraseña de Administrador" \
-        --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
-        --passwordbox "Ingresa la contraseña para $ADMIN_USER (Linux, Sudo y Samba):" 10 65 3>&1 1>&2 2>&3)
-    if [ $? -ne 0 ] || [ -z "$ADMIN_PASS" ]; then
-        whiptail --title "Error" --ok-button "< Aceptar >" --msgbox "La contraseña no puede estar vacía." 8 45
-        return
-    fi
+    DESC_PASS="[Conservar contraseña actual de Linux]"
+    [ -n "$ADMIN_PASS" ] && DESC_PASS="[Actualizar con nueva contraseña]"
 
     RESUMEN="PARAMETROS DE CONFIGURACION:
 * Funcion Principal    : $ROL_SERVER
 * Direccion IP Red     : $SERVER_IP
 * Disco Almacenamiento : $DISCO_SELECCIONADO
 * Nombre del Servidor  : $SMB_NETBIOS
-* Grupo de Trabajo     : $SMB_WORKGROUP
+* Grupo / Dominio      : $SMB_WORKGROUP
 * Administrador Web    : $ADMIN_USER (Permisos sudo totales)
+* Gestion Contraseña   : $DESC_PASS
 
 INCLUYE PARCHES AUTOMATICOS:
 - Integracion Cockpit File Sharing y difusion WSDD2
