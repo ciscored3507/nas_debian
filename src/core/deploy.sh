@@ -121,6 +121,10 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ -d "$SRC_DIR/web/backups" ]; then
     mkdir -p /usr/share/cockpit/backups
     cp -rf "$SRC_DIR/web/backups/"* /usr/share/cockpit/backups/
+    # Copiar PatternFly CSS desde Navigator (mismo archivo que usan todos los plugins 45Drives)
+    if [ -f /usr/share/cockpit/navigator/cockpit.css.gz ]; then
+        cp -f /usr/share/cockpit/navigator/cockpit.css.gz /usr/share/cockpit/backups/
+    fi
     chmod -R 755 /usr/share/cockpit/backups
 fi
 
