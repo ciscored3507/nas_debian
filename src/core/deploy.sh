@@ -11,7 +11,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)"
+# shellcheck source=src/lib/colors.sh
 source "$LIB_DIR/colors.sh"
+# shellcheck source=src/lib/helpers.sh
 source "$LIB_DIR/helpers.sh"
 
 TARGET_DISK="${1:-LOCAL}"
