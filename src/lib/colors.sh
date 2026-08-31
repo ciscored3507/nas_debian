@@ -1,21 +1,21 @@
 #!/bin/bash
-# shellcheck disable=SC2034
+
 # ==============================================================================
 # Librería: Colores ANSI y Títulos
 # ==============================================================================
 
 # Colores ANSI para terminal
-C_RESET="\033[0m"
-C_BOLD="\033[1m"
-C_CYAN="\033[1;36m"
-C_GREEN="\033[1;32m"
-C_YELLOW="\033[1;33m"
-C_RED="\033[1;31m"
-C_WHITE="\033[1;37m"
-C_GRAY="\033[0;90m"
+export C_RESET="\033[0m"
+export C_BOLD="\033[1m"
+export C_CYAN="\033[1;36m"
+export C_GREEN="\033[1;32m"
+export C_YELLOW="\033[1;33m"
+export C_RED="\033[1;31m"
+export C_WHITE="\033[1;37m"
+export C_GRAY="\033[0;90m"
 
 # Título global de la aplicación
-APP_TITLE="SERVIDOR NAS & CENTRAL DE RESPALDOS (DEBIAN 13)"
+export APP_TITLE="SERVIDOR NAS & CENTRAL DE RESPALDOS (DEBIAN 13)"
 
 # Configuración de paleta visual nativa para Whiptail
 export NEWT_COLORS="
