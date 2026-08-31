@@ -1,0 +1,44 @@
+name: Validacion NAS Debian
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint-bash:
+    name: Validar Scripts Bash (ShellCheck)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+      
+      - name: Ejecutar ShellCheck en todos los scripts
+        run: |
+          # Buscar recursivamente todos los archivos .sh y analizarlos
+          find . -type f -name "*.sh" -print0 | xargs -0 shellcheck -e SC2086 -e SC2155 -e SC2164 -e SC1091 -e SC1090
+
+  lint-python:
+    name: Validar Sintaxis Python (Flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+      
+      - name: Configurar entorno Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+          
+      - name: Analizar codigo de Cockpit
+        run: |
+          # Analizamos errores criticos de sintaxis en el backend web de backups
+          if [ -f "src/web/backups/backup_api.py" ]; then
+            flake8 src/web/backups/backup_api.py --select=E9,F63,F7,F82 --show-source
+          fi
