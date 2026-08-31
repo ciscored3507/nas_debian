@@ -63,13 +63,13 @@ instalar_nas() {
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --inputbox "Ingresa el nombre de red NetBIOS para este servidor:" 10 65 "$ROL_NETBIOS" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$SMB_NETBIOS" ]; then return; fi
-    SMB_NETBIOS=$(echo "$SMB_NETBIOS" | tr 'a-z' 'A-Z' | tr -cd 'A-Z0-9_-')
+    SMB_NETBIOS=$(echo "$SMB_NETBIOS" | tr '[:lower:]' '[:upper:]' | tr -cd '[:upper:]0-9_-')
 
     SMB_WORKGROUP=$(whiptail --title "Paso 3 de 5: Grupo de Trabajo o Dominio AD" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --inputbox "Ingresa el Workgroup o Dominio NetBIOS (ej. WORKGROUP o EMPRESA):" 10 65 "$DEFAULT_WG" 3>&1 1>&2 2>&3)
     if [ $? -ne 0 ] || [ -z "$SMB_WORKGROUP" ]; then return; fi
-    SMB_WORKGROUP=$(echo "$SMB_WORKGROUP" | tr 'a-z' 'A-Z' | tr -cd 'A-Z0-9_-')
+    SMB_WORKGROUP=$(echo "$SMB_WORKGROUP" | tr '[:lower:]' '[:upper:]' | tr -cd '[:upper:]0-9_-')
 
     # --------------------------------------------------------------------------
     # PASO 4: ADMINISTRADOR DE COCKPIT Y SAMBA
@@ -123,10 +123,10 @@ INCLUYE PARCHES AUTOMATICOS:
         --yesno "$RESUMEN" 20 74); then
         
         clear 2>/dev/null || true
-        echo -e "${C_CYAN}"
+        printf "%b" "${C_CYAN}"
         echo "  ╭──────────────────────────────────────────────────────────────────────╮"
         echo "  │        INICIANDO DESPLIEGUE AUTOMATIZADO DEL SERVIDOR ($ROL_SERVER)   │"
-        echo "  ╰──────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+        printf "  ╰──────────────────────────────────────────────────────────────────────╯%b\n\n" "${C_RESET}"
         
         CORE_DEPLOY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../core" && pwd)/deploy.sh"
         bash "$CORE_DEPLOY" "$DISCO_SELECCIONADO" "$SMB_WORKGROUP" "$SMB_NETBIOS" "$ADMIN_USER" "$ADMIN_PASS" "$ROL_SERVER"
