@@ -9,14 +9,14 @@
 ## 1. Identidad y Propósito del Proyecto
 
 * **Sistema Operativo Base:** Debian 13 (Trixie) GNU/Linux x86_64.
-* **Organización / Grupo de Trabajo:** `EAD-COL`.
+* **Organización / Grupo de Trabajo:** `TEAM-JOFRATO`.
 * **Identificadores NetBIOS por Defecto:**
-  * Servidor NAS de Archivos: `SRV-EAD-NAS`
-  * Servidor Central de Backup: `SRV-EAD-BKP`
+  * Servidor NAS de Archivos: `SRV-NAS`
+  * Servidor Central de Backup: `SRV-BKP`
 * **Dirección IP de Red Local de Prueba:** `10.10.1.2` (Subred `10.10.1.0/24`).
 * **Credenciales Administrativas de Entorno:**
-  * Usuario: `nas` / `root`
-  * Contraseña predeterminada: `DE0puFvp85#`
+  * Usuario: `usuario asignado` / `root`
+  * Contraseña predeterminada: `la que se asigne`
 * **Convención de Commits de Git:**
   * **REGLA ESTRICTA:** Los commits deben ser atómicos y granulares. **Debe existir un commit independiente por cada archivo modificado.** Si se alteran 3 archivos, se deben registrar 3 commits por separado.
   * Todos los mensajes de commit deben redactarse en **español** siguiendo el estándar convencional:
