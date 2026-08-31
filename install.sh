@@ -71,7 +71,9 @@ if [ -d "$INSTALL_DIR/.git" ]; then
 elif [ -f "$SCRIPT_DIR/src/asistente.sh" ] && [ "$SCRIPT_DIR" != "$INSTALL_DIR" ] && [ -d "$SCRIPT_DIR/.git" ]; then
     rm -rf "$INSTALL_DIR"
     git clone -q "$SCRIPT_DIR" "$INSTALL_DIR" 2>/dev/null || cp -a "$SCRIPT_DIR" "$INSTALL_DIR"
-    cd "$INSTALL_DIR" && git remote set-url origin "$REPO_URL" 2>/dev/null || true
+    if cd "$INSTALL_DIR"; then
+        git remote set-url origin "$REPO_URL" 2>/dev/null || true
+    fi
 else
     rm -rf "$INSTALL_DIR"
     git clone -q "$REPO_URL" "$INSTALL_DIR"
