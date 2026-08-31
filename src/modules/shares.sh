@@ -26,7 +26,8 @@ gestionar_recursos_compartidos() {
             "4" "[-] Eliminar un recurso compartido de la red" \
             "5" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
 
-        if [ $? -ne 0 ] || [ "$OPC_SHARE" == "5" ]; then
+        RET=$?
+        if [ $RET -ne 0 ] || [ "$OPC_SHARE" == "5" ]; then
             break
         fi
 
@@ -100,7 +101,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                 NOMBRE_SHARE=$(whiptail --title "$APP_TITLE" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ingresa el nombre del recurso para Windows (ej. VENTAS o BACKUPS):" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$NOMBRE_SHARE" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$NOMBRE_SHARE" ]; then continue; fi
 
                 NOMBRE_SHARE=$(echo "$NOMBRE_SHARE" | tr " " "_" | tr -cd "A-Za-z0-9_$-")
 
@@ -109,7 +111,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     --menu "Selecciona la visibilidad del recurso en el entorno de red de Windows:" 15 72 2 \
                     "1" "Recurso OCULTO ($) - No visible en explorador (Recomendado)" \
                     "2" "Recurso VISIBLE - Visible en explorador de red para todos" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$OPC_VIS" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$OPC_VIS" ]; then continue; fi
 
                 if [ "$OPC_VIS" == "1" ]; then
                     [[ "$NOMBRE_SHARE" != *\$ ]] && NOMBRE_SHARE="${NOMBRE_SHARE}\$"
@@ -125,7 +128,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                 RUTA_SHARE=$(whiptail --title "$APP_TITLE" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ruta física en el disco del servidor:" 10 65 "/srv/nas/$NOMBRE_DIR" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$RUTA_SHARE" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$RUTA_SHARE" ]; then continue; fi
 
                 COMENTARIO=$(whiptail --title "$APP_TITLE" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
@@ -139,7 +143,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     "2" "Solo Lectura General + Escritura Exclusiva (write list)" \
                     "3" "Solo Lectura Estricta (Nadie puede modificar desde la red)" \
                     "4" "Acceso Público / Invitados (Sin requerir contraseña)" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$TIPO_PERM" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$TIPO_PERM" ]; then continue; fi
 
                 GRUPOS_DISP=$(awk -F: '$1 ~ /^grp_/ {print $1}' /etc/group | sort -u)
                 if [ "$TIPO_PERM" != "4" ] && [ -z "$GRUPOS_DISP" ]; then
@@ -169,7 +174,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                             --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
                             --checklist "Marca con ESPACIO los grupos que tendrán acceso total a [$NOMBRE_SHARE]:" 18 70 8 \
                             $LISTA_OPC 3>&1 1>&2 2>&3)
-                        if [ $? -ne 0 ] || [ -z "$GRUPOS_SEL" ]; then continue; fi
+                        RET=$?
+                        if [ $RET -ne 0 ] || [ -z "$GRUPOS_SEL" ]; then continue; fi
 
                         VALID_USERS=$(echo "$GRUPOS_SEL" | tr -d '\"' | sed 's/^/@/; s/ / @/g; s/,/ @/g')
                         GRUPO_DUENO=$(echo "$GRUPOS_SEL" | tr -d '\"' | awk '{print $1}')
@@ -188,7 +194,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                             --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                             --checklist "Marca los grupos que tendrán permiso de SOLO LECTURA (consultar/descargar):" 18 70 8 \
                             $LISTA_OPC 3>&1 1>&2 2>&3)
-                        if [ $? -ne 0 ] || [ -z "$GRUPOS_RO" ]; then continue; fi
+                        RET=$?
+                        if [ $RET -ne 0 ] || [ -z "$GRUPOS_RO" ]; then continue; fi
 
                         MENU_RW=""
                         for g in $GRUPOS_DISP; do
@@ -199,7 +206,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                             --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                             --menu "Selecciona el grupo que tendrá permiso de ESCRITURA (subir/modificar/borrar):" 18 70 8 \
                             $MENU_RW 3>&1 1>&2 2>&3)
-                        if [ $? -ne 0 ] || [ -z "$GRUPO_RW" ]; then continue; fi
+                        RET=$?
+                        if [ $RET -ne 0 ] || [ -z "$GRUPO_RW" ]; then continue; fi
 
                         TODOS_GRPS=$(echo "$GRUPOS_RO $GRUPO_RW" | tr -d '\"' | tr ' ' '\n' | sort -u | tr '\n' ' ')
                         VALID_USERS=$(echo "$TODOS_GRPS" | sed 's/^/@/; s/ $//; s/ / @/g')
@@ -222,7 +230,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                             --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
                             --checklist "Marca los grupos autorizados para ver este contenido histórico:" 18 70 8 \
                             $LISTA_OPC 3>&1 1>&2 2>&3)
-                        if [ $? -ne 0 ] || [ -z "$GRUPOS_RO_ESTRICTO" ]; then continue; fi
+                        RET=$?
+                        if [ $RET -ne 0 ] || [ -z "$GRUPOS_RO_ESTRICTO" ]; then continue; fi
 
                         VALID_USERS=$(echo "$GRUPOS_RO_ESTRICTO" | tr -d '\"' | sed 's/^/@/; s/ / @/g')
                         GRUPO_DUENO=$(echo "$GRUPOS_RO_ESTRICTO" | tr -d '\"' | awk '{print $1}')
@@ -238,7 +247,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                             --menu "Selecciona los permisos para usuarios no autenticados / invitados:" 14 70 2 \
                             "1" "Solo Lectura (Invitados pueden ver y descargar sin borrar)" \
                             "2" "Lectura y Escritura Total (Invitados pueden subir y borrar)" 3>&1 1>&2 2>&3)
-                        if [ $? -ne 0 ] || [ -z "$OPC_PUB" ]; then continue; fi
+                        RET=$?
+                        if [ $RET -ne 0 ] || [ -z "$OPC_PUB" ]; then continue; fi
 
                         GUEST_OK="yes"
                         VALID_USERS=""
@@ -332,7 +342,8 @@ for m in re.finditer(r"\[([^\]]+)\]", text):
                     --menu "Selecciona el recurso para conmutar su estado en la red:" 18 70 8 \
                     $MENU_ITEMS 3>&1 1>&2 2>&3)
 
-                if [ $? -eq 0 ] && [ -n "$TARGET_SHARE" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$TARGET_SHARE" ]; then
                     if (whiptail --title "Confirmar Cambio de Estado" \
                         --yes-button "< Sí, Cambiar Estado >" --no-button "< Cancelar >" \
                         --yesno "¿Estás seguro de que deseas conmutar el estado del recurso \"[$TARGET_SHARE]\" en la red?" 10 68); then
@@ -393,7 +404,8 @@ for line in lines:
                     --menu "Selecciona el recurso que deseas eliminar definitivamente:" 18 70 8 \
                     $MENU_DEL 3>&1 1>&2 2>&3)
 
-                if [ $? -eq 0 ] && [ -n "$SHARE_A_BORRAR" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$SHARE_A_BORRAR" ]; then
                     if (whiptail --title "Confirmación de Eliminación" \
                         --yes-button "< Sí, Eliminar Recurso >" --no-button "< Cancelar >" \
                         --yesno "¿Estás 100% seguro de eliminar la definición del recurso \"[$SHARE_A_BORRAR]\" de la red Samba?\n\n(Nota: Los archivos físicos en el disco se mantendrán protegidos)." 11 68); then
