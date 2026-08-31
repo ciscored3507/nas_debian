@@ -99,7 +99,7 @@ ACCOUNTS_EOF
 fi
 
 # 2. Parche Cockpit Identities (Filtrar exclusivamente grupos grp_* y usuarios reales 1000 <= UID < 60000)
-# shellcheck disable=SC2016
+
 python3 -c '
 import glob, os
 
@@ -107,7 +107,7 @@ for js in glob.glob("/usr/share/cockpit/identities/assets/*.js"):
     try:
         with open(js, "r", encoding="utf-8") as f:
             c = f.read()
-        c = c.replace("l.value=f.split(`\\n`).filter(w=>!/^\\s*$/.test(w))", "l.value=f.split(`\\n`).filter(w=>w.startsWith(\"grp_\"))")
+        c = c.replace("l.value=f.split(\"\\n\").filter(w=>!/^\\s*$/.test(w))", "l.value=f.split(\"\\n\").filter(w=>w.startsWith(\"grp_\"))")
         c = c.replace("if(u<1e3&&u!==0)return null;", "if(u<1e3||u>=6e4)return null;")
         c = c.replace("if(u<1e3)return null;", "if(u<1e3||u>=6e4)return null;")
         with open(js, "w", encoding="utf-8") as f:
