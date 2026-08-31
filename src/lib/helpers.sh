@@ -16,7 +16,7 @@ obtener_ip_local() {
 # Detección del hostname real de la máquina para NetBIOS por defecto
 obtener_netbios_defecto() {
     local cur_host
-    cur_host=$(hostname -s 2>/dev/null | tr 'a-z' 'A-Z' | tr -cd 'A-Z0-9_-')
+    cur_host=$(hostname -s 2>/dev/null | tr '[:lower:]' '[:upper:]' | tr -cd '[:upper:]0-9_-')
     if [ -n "$cur_host" ] && [ "$cur_host" != "LOCALHOST" ]; then
         echo "$cur_host"
     else
@@ -28,7 +28,7 @@ obtener_netbios_defecto() {
 obtener_workgroup_defecto() {
     local wg
     if [ -f /etc/samba/smb.conf ]; then
-        wg=$(grep -i "^\s*workgroup\s*=" /etc/samba/smb.conf | head -n1 | awk -F= '{print $2}' | tr -d ' ' | tr 'a-z' 'A-Z')
+        wg=$(grep -i "^\s*workgroup\s*=" /etc/samba/smb.conf | head -n1 | awk -F= '{print $2}' | tr -d ' ' | tr '[:lower:]' '[:upper:]')
     fi
     echo "${wg:-WORKGROUP}"
 }
