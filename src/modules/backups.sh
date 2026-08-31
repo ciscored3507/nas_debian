@@ -225,7 +225,7 @@ RUNNER_EOF
                     --msgbox "✔ ¡Tarea de Backup \"[$TASK_NAME]\" creada y programada!\n\n• Origen:      \\\\$WIN_IP\\$WIN_SHARE (CIFS)\n• Destino:     /srv/nas/BACKUPS_HISTORICOS/$TASK_NAME\n• Frecuencia:  $CRON_EXPR\n• Retención:   $RETENTION snapshots con deduplicación" 14 72
                 ;;
 
-            2)
+            3)
                 # Respaldo de Servidor Linux Remoto (SSH + Rsync)
                 TASK_NAME=$(whiptail --title "Paso 1 de 5: Identificador de Tarea" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
