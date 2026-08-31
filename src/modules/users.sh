@@ -229,12 +229,12 @@ w_role = max(max(len(r[2]) for r in rows), 16)
 w_stat = max(max(len(r[3]) for r in rows), 12)
 w_grps = max(max(len(r[4]) for r in rows), 22)
 
-print(f"┌─{"─"*w_user}─┬─{"─"*w_name}─┬─{"─"*w_role}─┬─{"─"*w_stat}─┬─{"─"*w_grps}─┐")
-print(f"│ {"USUARIO".ljust(w_user)} │ {"NOMBRE COMPLETO / CARGO".ljust(w_name)} │ {"ACCESO / ROL".ljust(w_role)} │ {"ESTADO".ljust(w_stat)} │ {"GRUPOS ASIGNADOS".ljust(w_grps)} │")
-print(f"├─{"─"*w_user}─┼─{"─"*w_name}─┼─{"─"*w_role}─┼─{"─"*w_stat}─┼─{"─"*w_grps}─┤")
+print("┌─{}─┬─{}─┬─{}─┬─{}─┬─{}─┐".format("─"*w_user, "─"*w_name, "─"*w_role, "─"*w_stat, "─"*w_grps))
+print("│ {} │ {} │ {} │ {} │ {} │".format("USUARIO".ljust(w_user), "NOMBRE COMPLETO / CARGO".ljust(w_name), "ACCESO / ROL".ljust(w_role), "ESTADO".ljust(w_stat), "GRUPOS ASIGNADOS".ljust(w_grps)))
+print("├─{}─┼─{}─┼─{}─┼─{}─┼─{}─┤".format("─"*w_user, "─"*w_name, "─"*w_role, "─"*w_stat, "─"*w_grps))
 for r in rows:
-    print(f"│ {r[0].ljust(w_user)} │ {r[1].ljust(w_name)} │ {r[2].ljust(w_role)} │ {r[3].ljust(w_stat)} │ {r[4].ljust(w_grps)} │")
-print(f"└─{"─"*w_user}─┴─{"─"*w_name}─┴─{"─"*w_role}─┴─{"─"*w_stat}─┴─{"─"*w_grps}─┘")
+    print("│ {} │ {} │ {} │ {} │ {} │".format(r[0].ljust(w_user), r[1].ljust(w_name), r[2].ljust(w_role), r[3].ljust(w_stat), r[4].ljust(w_grps)))
+print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*w_user, "─"*w_name, "─"*w_role, "─"*w_stat, "─"*w_grps))
 ')
                 whiptail --title "CRUD: Usuarios Registrados en Samba" --ok-button "< Aceptar >" --msgbox "$TABLA_USERS" 20 96
                 ;;

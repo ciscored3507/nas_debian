@@ -77,12 +77,12 @@ w_src  = max(max(len(r[2]) for r in rows), 24)
 w_cron = max(max(len(r[3]) for r in rows), 12)
 w_ret  = max(max(len(r[4]) for r in rows), 10)
 
-print(f"┌─{"─"*w_name}─┬─{"─"*w_prot}─┬─{"─"*w_src}─┬─{"─"*w_cron}─┬─{"─"*w_ret}─┐")
-print(f"│ {"IDENTIFICADOR".ljust(w_name)} │ {"PROTOCOLO".ljust(w_prot)} │ {"ORIGEN REMOTO / LOCAL".ljust(w_src)} │ {"HORARIO CRON".ljust(w_cron)} │ {"RETENCIÓN".ljust(w_ret)} │")
-print(f"├─{"─"*w_name}─┼─{"─"*w_prot}─┼─{"─"*w_src}─┼─{"─"*w_cron}─┼─{"─"*w_ret}─┤")
+print("┌─{}─┬─{}─┬─{}─┬─{}─┬─{}─┐".format("─"*w_name, "─"*w_prot, "─"*w_src, "─"*w_cron, "─"*w_ret))
+print("│ {} │ {} │ {} │ {} │ {} │".format("IDENTIFICADOR".ljust(w_name), "PROTOCOLO".ljust(w_prot), "ORIGEN REMOTO / LOCAL".ljust(w_src), "HORARIO CRON".ljust(w_cron), "RETENCIÓN".ljust(w_ret)))
+print("├─{}─┼─{}─┼─{}─┼─{}─┼─{}─┤".format("─"*w_name, "─"*w_prot, "─"*w_src, "─"*w_cron, "─"*w_ret))
 for r in rows:
-    print(f"│ {r[0].ljust(w_name)} │ {r[1].ljust(w_prot)} │ {r[2].ljust(w_src)} │ {r[3].ljust(w_cron)} │ {r[4].ljust(w_ret)} │")
-print(f"└─{"─"*w_name}─┴─{"─"*w_prot}─┴─{"─"*w_src}─┴─{"─"*w_cron}─┴─{"─"*w_ret}─┘")
+    print("│ {} │ {} │ {} │ {} │ {} │".format(r[0].ljust(w_name), r[1].ljust(w_prot), r[2].ljust(w_src), r[3].ljust(w_cron), r[4].ljust(w_ret)))
+print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*w_name, "─"*w_prot, "─"*w_src, "─"*w_cron, "─"*w_ret))
 ')
                 whiptail --title "CRUD: Tareas de Backup Programadas" --ok-button "< Aceptar >" --msgbox "$TABLA_BKPS" 18 78
                 ;;
