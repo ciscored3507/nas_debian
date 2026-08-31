@@ -17,7 +17,8 @@ gestionar_backups() {
             "5" "[-] Eliminar una Tarea de Backup Programada" \
             "6" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
 
-        if [ $? -ne 0 ] || [ "$OPC_BKP" == "6" ]; then
+        RET=$?
+        if [ $RET -ne 0 ] || [ "$OPC_BKP" == "6" ]; then
             break
         fi
 
@@ -94,29 +95,34 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                 TASK_NAME=$(whiptail --title "Paso 1 de 5: Identificador de Tarea" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ingresa un nombre único para esta tarea (ej. srv_ad_contabilidad):" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
                 TASK_NAME=$(echo "$TASK_NAME" | tr " " "_" | tr -cd "A-Za-z0-9_-")
 
                 WIN_IP=$(whiptail --title "Paso 2 de 5: Servidor Windows Remoto" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Dirección IP o Nombre del Servidor Windows (ej. 10.10.1.50):" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$WIN_IP" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$WIN_IP" ]; then continue; fi
 
                 WIN_SHARE=$(whiptail --title "Paso 3 de 5: Recurso Compartido Remoto" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Nombre de la carpeta compartida en Windows (ej. Documentos o C$):" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$WIN_SHARE" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$WIN_SHARE" ]; then continue; fi
                 WIN_SHARE=$(echo "$WIN_SHARE" | tr -d '/')
 
                 WIN_USER=$(whiptail --title "Paso 4 de 5: Credenciales de Acceso" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Usuario de Windows con permisos de lectura (ej. Administrador o DOMINIO\\admin):" 10 65 "Administrador" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$WIN_USER" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$WIN_USER" ]; then continue; fi
 
                 WIN_PASS=$(whiptail --title "Paso 4 de 5: Credenciales de Acceso" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --passwordbox "Contraseña para el usuario $WIN_USER:" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ]; then continue; fi
 
                 # Test de conexión en vivo con smbclient
                 if command -v smbclient &>/dev/null; then
@@ -135,7 +141,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     "2" "Cada 6 horas (00:00, 06:00, 12:00, 18:00)" \
                     "3" "Cada hora en punto" \
                     "4" "Personalizado (Expresión cron manual)" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$CRON_SCHED" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$CRON_SCHED" ]; then continue; fi
 
                 case "$CRON_SCHED" in
                     1) CRON_EXPR="0 23 * * *" ;;
@@ -144,7 +151,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     4) 
                         CRON_EXPR=$(whiptail --title "Cron Personalizado" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                             --inputbox "Ingresa la expresión cron (Minuto Hora Día Mes DíaSemana):" 10 65 "0 2 * * *" 3>&1 1>&2 2>&3)
-                        if [ $? -ne 0 ] || [ -z "$CRON_EXPR" ]; then continue; fi
+                        RET=$?
+                        if [ $RET -ne 0 ] || [ -z "$CRON_EXPR" ]; then continue; fi
                         ;;
                 esac
 
@@ -230,13 +238,15 @@ RUNNER_EOF
                 TASK_NAME=$(whiptail --title "Paso 1 de 5: Identificador de Tarea" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ingresa un nombre único para esta tarea (ej. srv_linux_web):" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
                 TASK_NAME=$(echo "$TASK_NAME" | tr " " "_" | tr -cd "A-Za-z0-9_-")
 
                 LNX_IP=$(whiptail --title "Paso 2 de 5: Servidor Linux Remoto" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Dirección IP o Nombre del Servidor Linux Remoto:" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$LNX_IP" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$LNX_IP" ]; then continue; fi
 
                 LNX_PORT=$(whiptail --title "Puerto SSH" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Puerto SSH del Servidor Remoto:" 10 65 "22" 3>&1 1>&2 2>&3)
@@ -245,17 +255,20 @@ RUNNER_EOF
                 LNX_PATH=$(whiptail --title "Paso 3 de 5: Ruta Remota a Respaldar" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ruta absoluta en el servidor remoto (ej. /var/www o /etc):" 10 65 "/var/www" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$LNX_PATH" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$LNX_PATH" ]; then continue; fi
 
                 LNX_USER=$(whiptail --title "Paso 4 de 5: Credenciales SSH" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Usuario SSH en el servidor remoto:" 10 65 "root" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$LNX_USER" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$LNX_USER" ]; then continue; fi
 
                 LNX_PASS=$(whiptail --title "Paso 4 de 5: Credenciales SSH" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --passwordbox "Contraseña SSH para el usuario $LNX_USER:" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ]; then continue; fi
 
                 CRON_SCHED=$(whiptail --title "Paso 5 de 5: Frecuencia de Ejecución" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
@@ -263,7 +276,8 @@ RUNNER_EOF
                     "1" "Diario a las 02:00 hrs de la madrugada (Recomendado)" \
                     "2" "Cada 12 horas" \
                     "3" "Personalizado (Expresión cron manual)" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$CRON_SCHED" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$CRON_SCHED" ]; then continue; fi
 
                 case "$CRON_SCHED" in
                     1) CRON_EXPR="0 2 * * *" ;;
@@ -271,7 +285,8 @@ RUNNER_EOF
                     3) 
                         CRON_EXPR=$(whiptail --title "Cron Personalizado" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                             --inputbox "Ingresa la expresión cron (Minuto Hora Día Mes DíaSemana):" 10 65 "0 3 * * *" 3>&1 1>&2 2>&3)
-                        if [ $? -ne 0 ] || [ -z "$CRON_EXPR" ]; then continue; fi
+                        RET=$?
+                        if [ $RET -ne 0 ] || [ -z "$CRON_EXPR" ]; then continue; fi
                         ;;
                 esac
 
@@ -346,13 +361,15 @@ RUNNER_EOF
                 TASK_NAME=$(whiptail --title "Paso 1 de 4: Identificador de Tarea" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ingresa un nombre único para esta tarea local:" 10 65 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$TASK_NAME" ]; then continue; fi
                 TASK_NAME=$(echo "$TASK_NAME" | tr " " "_" | tr -cd "A-Za-z0-9_-")
 
                 LOC_SRC=$(whiptail --title "Paso 2 de 4: Ruta Origen Local" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ruta física absoluta de la carpeta origen a respaldar:" 10 65 "/srv/nas/SISTEMAS" 3>&1 1>&2 2>&3)
-                if [ $? -ne 0 ] || [ -z "$LOC_SRC" ]; then continue; fi
+                RET=$?
+                if [ $RET -ne 0 ] || [ -z "$LOC_SRC" ]; then continue; fi
 
                 CRON_EXPR=$(whiptail --title "Paso 3 de 4: Horario de Ejecución" --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Expresión cron (por defecto a las 23:30 hrs diario):" 10 65 "30 23 * * *" 3>&1 1>&2 2>&3)
@@ -429,7 +446,8 @@ RUNNER_EOF
                     --menu "Selecciona la tarea que deseas eliminar:" 16 68 6 \
                     $MENU_DEL 3>&1 1>&2 2>&3)
 
-                if [ $? -eq 0 ] && [ -n "$TASK_DEL_SEL" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$TASK_DEL_SEL" ]; then
                     if (whiptail --title "Confirmar Eliminación de Tarea" \
                         --yes-button "< Sí, Eliminar Tarea >" --no-button "< Cancelar >" \
                         --yesno "¿Estás seguro de que deseas eliminar la tarea [$TASK_DEL_SEL] y sus credenciales?\n\n(Los respaldos históricos en disco no se borrarán)." 12 70); then
