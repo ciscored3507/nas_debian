@@ -15,7 +15,7 @@ actualizar_desde_git() {
     echo -e "${C_CYAN}"
     echo "  ╭──────────────────────────────────────────────────────────────────────────╮"
     echo "  │             BUSCANDO ACTUALIZACIONES DEL PROYECTO EN GITHUB              │"
-    echo "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+    printf "  ╰──────────────────────────────────────────────────────────────────────────╯%b\n\n" "${C_RESET}"
 
     git config --system --add safe.directory "$PROJECT_ROOT" 2>/dev/null || git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
 
