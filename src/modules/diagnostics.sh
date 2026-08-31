@@ -42,7 +42,8 @@ diagnostico_nas() {
     for b in /etc/cron.d/backup_*; do
         if [ -f "$b" ]; then
             has_bkp=true
-            local c_expr=$(awk '{print $1,$2,$3,$4,$5}' "$b")
+            local c_expr
+            c_expr=$(awk '{print $1,$2,$3,$4,$5}' "$b")
             echo -e "     [⏱] ${C_CYAN}$(basename "$b" | sed "s/backup_//"):${C_RESET} ${C_WHITE}${c_expr}${C_RESET}"
         fi
     done
