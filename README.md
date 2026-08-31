@@ -1,8 +1,13 @@
 # Servidor NAS & Central de Respaldos Multiplataforma (Debian 13)
 
+[![Debian 13](https://img.shields.io/badge/OS-Debian%2013%20(Trixie)-A81D33?style=for-the-badge&logo=debian&logoColor=white)]() [![Bash Shell](https://img.shields.io/badge/Scripting-Bash-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)]() [![Samba](https://img.shields.io/badge/Service-Samba%20SMB-0066CC?style=for-the-badge)]() [![Cockpit](https://img.shields.io/badge/Web%20UI-Cockpit-FF6600?style=for-the-badge)]()
+
 Este repositorio contiene la suite de scripts interactivos y automatizados para desplegar y administrar servidores de almacenamiento en red (**NAS Departamental**) y **Centrales de Copias de Seguridad** inmunes a ransomware bajo **Debian 13 (Trixie)**.
 
 ## ⚡ Instalación Rápida en 1 Línea (One-Liner Remoto)
+
+> [!TIP]
+> Este instalador verifica dependencias, descarga el entorno y te presenta el menú interactivo sin tocar tus particiones hasta que lo autorices.
 
 Puedes instalar y desplegar todo el entorno en cualquier servidor Debian 13 ejecutando una sola línea en tu terminal:
 
