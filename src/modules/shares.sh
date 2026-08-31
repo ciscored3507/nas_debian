@@ -8,7 +8,7 @@ gestionar_recursos_compartidos() {
     local NOMBRE_DIR COMENTARIO RUTA_SHARE TIPO_PERM GRUPOS_DISP LISTA_OPC GRUPOS_SEL TODOS_GRPS
     local VALID_USERS WRITE_LIST READ_ONLY MASK GRUPO_DUENO TIPO_TXT GRUPOS_RO GRUPOS_RO_ESTRICTO
     local GRUPO_RW MENU_RW STATUS LISTA_SHARES MENU_ITEMS TARGET_SHARE NUEVO_ESTADO
-    local LISTA_ELIMINAR MENU_DEL SHARE_A_BORRAR p g
+    local LISTA_ELIMINAR MENU_DEL SHARE_A_BORRAR g
     
     if [ ! -f /etc/samba/smb.conf ]; then
         whiptail --title "Samba no configurado" --ok-button "< Aceptar >" \
