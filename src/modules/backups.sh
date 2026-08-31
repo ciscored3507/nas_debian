@@ -436,15 +436,15 @@ RUNNER_EOF
                     continue
                 fi
 
-                MENU_DEL=""
+                local -a MENU_DEL=()
                 for t in $TAREAS_DEL; do
-                    MENU_DEL="$MENU_DEL $t Tarea_Programada"
+                    MENU_DEL+=("$t" "Tarea_Programada")
                 done
 
                 TASK_DEL_SEL=$(whiptail --title "Eliminar Tarea de Backup" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona la tarea que deseas eliminar:" 16 68 6 \
-                    $MENU_DEL 3>&1 1>&2 2>&3)
+                    "${MENU_DEL[@]}" 3>&1 1>&2 2>&3)
 
                 RET=$?
                 if [ $RET -eq 0 ] && [ -n "$TASK_DEL_SEL" ]; then
