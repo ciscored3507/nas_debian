@@ -22,7 +22,7 @@ ADMIN_PASS="${5:-}"
 SERVER_ROLE="${6:-ARCHIVOS}"
 
 SERVER_IP=$(obtener_ip_local)
-HOST_NAME_LOWER=$(echo "$SMB_NETBIOS" | tr 'A-Z' 'a-z')
+HOST_NAME_LOWER=$(echo "$SMB_NETBIOS" | tr '[:upper:]' '[:lower:]')
 
 echo "=============================================================================="
 echo " INICIANDO DESPLIEGUE: $SERVER_ROLE (IP: $SERVER_IP)"
@@ -100,6 +100,7 @@ ACCOUNTS_EOF
 fi
 
 # 2. Parche Cockpit Identities (Filtrar exclusivamente grupos grp_* y usuarios reales 1000 <= UID < 60000)
+# shellcheck disable=SC2016
 python3 -c '
 import glob, os
 
@@ -288,5 +289,5 @@ echo " Rol del Servidor: $SERVER_ROLE"
 echo " Almacenamiento  : /srv/nas ($TARGET_DISK)"
 echo " Administrador   : $ADMIN_USER (con permisos sudo y Samba)"
 echo " Panel Web       : https://${SERVER_IP}:9090"
-echo " Red Windows     : \\\\${SERVER_IP} (o \\\\$SMB_NETBIOS)"
+printf " Red Windows     : \\\\\\\\%s (o \\\\\\\\%s)\n" "${SERVER_IP}" "$SMB_NETBIOS"
 echo "=============================================================================="
