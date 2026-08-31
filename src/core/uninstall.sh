@@ -37,7 +37,7 @@ rm -rf /usr/share/cockpit/file-sharing /usr/share/cockpit/identities /usr/share/
 rm -f /etc/udev/rules.d/80-udisks2-hide-os.rules
 
 echo "[5/6] Eliminando grupos creados..."
-for grp in $(grep -E '^grp_' /etc/group | cut -d: -f1); do
+grep -E '^grp_' /etc/group | cut -d: -f1 | while read -r grp; do
     groupdel "$grp" 2>/dev/null || true
 done
 
