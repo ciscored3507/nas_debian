@@ -77,15 +77,15 @@ print("└─{}─┴─{}─┴─{}─┘".format("─"*w_name, "─"*w_gid, "
                     continue
                 fi
 
-                MENU_ELIM=""
+                local -a MENU_ELIM=()
                 for g in $GRUPOS_ELIM; do
-                    MENU_ELIM="$MENU_ELIM $g Grupo_Personalizado"
+                    MENU_ELIM+=("$g" "Grupo_Personalizado")
                 done
 
                 GRP_BORRAR=$(whiptail --title "Eliminar Grupo" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el grupo que deseas eliminar:" 16 68 6 \
-                    $MENU_ELIM 3>&1 1>&2 2>&3)
+                    "${MENU_ELIM[@]}" 3>&1 1>&2 2>&3)
 
                 RET=$?
                 if [ $RET -eq 0 ] && [ -n "$GRP_BORRAR" ]; then
