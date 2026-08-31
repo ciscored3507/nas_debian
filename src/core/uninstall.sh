@@ -42,8 +42,8 @@ grep -E '^grp_' /etc/group | cut -d: -f1 | while read -r grp; do
 done
 
 echo "[6/6] Restaurando /etc/motd..."
-> /etc/motd
-> /etc/issue.net
+: > /etc/motd
+: > /etc/issue.net
 
 echo ""
 echo "=============================================================================="
