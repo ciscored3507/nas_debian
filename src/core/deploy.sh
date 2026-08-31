@@ -22,7 +22,6 @@ ADMIN_PASS="${5:-}"
 SERVER_ROLE="${6:-ARCHIVOS}"
 
 SERVER_IP=$(obtener_ip_local)
-HOST_NAME_LOWER=$(echo "$SMB_NETBIOS" | tr '[:upper:]' '[:lower:]')
 
 echo "=============================================================================="
 echo " INICIANDO DESPLIEGUE: $SERVER_ROLE (IP: $SERVER_IP)"
