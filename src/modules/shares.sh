@@ -163,17 +163,17 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
 
                 case "$TIPO_PERM" in
                     1)
-                        LISTA_OPC=""
+                        local -a LISTA_OPC=()
                         for g in $GRUPOS_DISP; do
                             STATUS="OFF"
                             [ "$g" == "grp_sistemas" ] && STATUS="ON"
-                            LISTA_OPC="$LISTA_OPC $g $g $STATUS"
+                            LISTA_OPC+=("$g" "$g" "$STATUS")
                         done
 
                         GRUPOS_SEL=$(whiptail --title "Grupos con Lectura y Escritura" \
                             --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
                             --checklist "Marca con ESPACIO los grupos que tendrán acceso total a [$NOMBRE_SHARE]:" 18 70 8 \
-                            $LISTA_OPC 3>&1 1>&2 2>&3)
+                            "${LISTA_OPC[@]}" 3>&1 1>&2 2>&3)
                         RET=$?
                         if [ $RET -ne 0 ] || [ -z "$GRUPOS_SEL" ]; then continue; fi
 
@@ -185,27 +185,27 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                         ;;
 
                     2)
-                        LISTA_OPC=""
+                        local -a LISTA_OPC=()
                         for g in $GRUPOS_DISP; do
-                            LISTA_OPC="$LISTA_OPC $g $g OFF"
+                            LISTA_OPC+=("$g" "$g" "OFF")
                         done
 
                         GRUPOS_RO=$(whiptail --title "Paso A: Grupos con Permiso de Solo Lectura" \
                             --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                             --checklist "Marca los grupos que tendrán permiso de SOLO LECTURA (consultar/descargar):" 18 70 8 \
-                            $LISTA_OPC 3>&1 1>&2 2>&3)
+                            "${LISTA_OPC[@]}" 3>&1 1>&2 2>&3)
                         RET=$?
                         if [ $RET -ne 0 ] || [ -z "$GRUPOS_RO" ]; then continue; fi
 
-                        MENU_RW=""
+                        local -a MENU_RW=()
                         for g in $GRUPOS_DISP; do
-                            MENU_RW="$MENU_RW $g Grupo_$g"
+                            MENU_RW+=("$g" "Grupo_$g")
                         done
 
                         GRUPO_RW=$(whiptail --title "Paso B: Grupo con Escritura Exclusiva" \
                             --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                             --menu "Selecciona el grupo que tendrá permiso de ESCRITURA (subir/modificar/borrar):" 18 70 8 \
-                            $MENU_RW 3>&1 1>&2 2>&3)
+                            "${MENU_RW[@]}" 3>&1 1>&2 2>&3)
                         RET=$?
                         if [ $RET -ne 0 ] || [ -z "$GRUPO_RW" ]; then continue; fi
 
@@ -219,17 +219,17 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                         ;;
 
                     3)
-                        LISTA_OPC=""
+                        local -a LISTA_OPC=()
                         for g in $GRUPOS_DISP; do
                             STATUS="OFF"
                             [ "$g" == "grp_sistemas" ] && STATUS="ON"
-                            LISTA_OPC="$LISTA_OPC $g $g $STATUS"
+                            LISTA_OPC+=("$g" "$g" "$STATUS")
                         done
 
                         GRUPOS_RO_ESTRICTO=$(whiptail --title "Grupos con Acceso de Solo Lectura Estricta" \
                             --ok-button "< Continuar >" --cancel-button "< Cancelar >" \
                             --checklist "Marca los grupos autorizados para ver este contenido histórico:" 18 70 8 \
-                            $LISTA_OPC 3>&1 1>&2 2>&3)
+                            "${LISTA_OPC[@]}" 3>&1 1>&2 2>&3)
                         RET=$?
                         if [ $RET -ne 0 ] || [ -z "$GRUPOS_RO_ESTRICTO" ]; then continue; fi
 
@@ -332,15 +332,15 @@ for m in re.finditer(r"\[([^\]]+)\]", text):
                     continue
                 fi
 
-                MENU_ITEMS=""
+                local -a MENU_ITEMS=()
                 while read -r name status; do
-                    MENU_ITEMS="$MENU_ITEMS $name $status"
+                    MENU_ITEMS+=("$name" "$status")
                 done <<< "$LISTA_SHARES"
 
                 TARGET_SHARE=$(whiptail --title "Alternar Estado de Recurso" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el recurso para conmutar su estado en la red:" 18 70 8 \
-                    $MENU_ITEMS 3>&1 1>&2 2>&3)
+                    "${MENU_ITEMS[@]}" 3>&1 1>&2 2>&3)
 
                 RET=$?
                 if [ $RET -eq 0 ] && [ -n "$TARGET_SHARE" ]; then
@@ -394,15 +394,15 @@ for line in lines:
                     continue
                 fi
 
-                MENU_DEL=""
+                local -a MENU_DEL=()
                 for s in $LISTA_ELIMINAR; do
-                    MENU_DEL="$MENU_DEL $s Recurso_Samba"
+                    MENU_DEL+=("$s" "Recurso_Samba")
                 done
 
                 SHARE_A_BORRAR=$(whiptail --title "Eliminar Recurso Compartido" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el recurso que deseas eliminar definitivamente:" 18 70 8 \
-                    $MENU_DEL 3>&1 1>&2 2>&3)
+                    "${MENU_DEL[@]}" 3>&1 1>&2 2>&3)
 
                 RET=$?
                 if [ $RET -eq 0 ] && [ -n "$SHARE_A_BORRAR" ]; then
