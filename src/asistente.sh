@@ -100,7 +100,8 @@ while true; do
         "8" "[8]  Buscar Actualizaciones desde GitHub (Auto-Update)" \
         "9" "[9]  Desinstalar y Limpiar Servidor" 3>&1 1>&2 2>&3)
 
-    if [ $? -ne 0 ]; then
+    RET=$?
+    if [ $RET -ne 0 ]; then
         clear 2>/dev/null || true
         break
     fi
