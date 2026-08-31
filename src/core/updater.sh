@@ -5,6 +5,7 @@
 
 # set -e eliminado porque infecta a todo el asistente cuando se importa con source
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)"
+# shellcheck source=src/lib/colors.sh
 source "$LIB_DIR/colors.sh" 2>/dev/null || true
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -20,7 +21,7 @@ actualizar_desde_git() {
     git config --system --add safe.directory "$PROJECT_ROOT" 2>/dev/null || git config --global --add safe.directory "$PROJECT_ROOT" 2>/dev/null || true
 
     if [ -d "$PROJECT_ROOT/.git" ]; then
-        cd "$PROJECT_ROOT"
+        cd "$PROJECT_ROOT" || return
         echo -e " [•] Conectando con GitHub..."
         git fetch origin main 2>/dev/null || true
         CURRENT_REV=$(git rev-parse HEAD 2>/dev/null || echo "1")
