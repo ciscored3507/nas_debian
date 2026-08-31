@@ -43,17 +43,17 @@ crear_usuario_guiado() {
         return
     fi
 
-    LISTA_OPCIONES=""
+    local -a LISTA_OPCIONES=()
     for g in $GRUPOS_DISP; do
         [ "$g" == "$USER_NAME" ] && continue
         STATUS="OFF"
-        LISTA_OPCIONES="$LISTA_OPCIONES $g Grupo_$g $STATUS"
+        LISTA_OPCIONES+=("$g" "Grupo_$g" "$STATUS")
     done
 
     GRUPOS_SELEC=$(whiptail --title "Paso 3 de 4: Asignación de Grupos" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --checklist "Marca con la BARRA ESPACIADORA [X] los grupos a los que pertenecerá '$USER_NAME':" 18 74 8 \
-        $LISTA_OPCIONES 3>&1 1>&2 2>&3)
+        "${LISTA_OPCIONES[@]}" 3>&1 1>&2 2>&3)
 
     RET=$?
     if [ $RET -ne 0 ] || [ -z "$GRUPOS_SELEC" ]; then
@@ -139,7 +139,7 @@ for u, data in users.items():
     USER_SEL=$(whiptail --title "Alternar Estado de Usuario (Activar / Suspender)" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --menu "Selecciona el usuario para suspender o reactivar su acceso a la red:" 18 72 8 \
-        $MENU_ITEMS 3>&1 1>&2 2>&3)
+        "${MENU_ITEMS[@]}" 3>&1 1>&2 2>&3)
 
     RET=$?
     if [ $RET -eq 0 ] && [ -n "$USER_SEL" ]; then
@@ -263,29 +263,29 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     whiptail --ok-button "< Aceptar >" --msgbox "No hay usuarios registrados." 8 45
                     continue
                 fi
-                MENU_USERS=""
+                local -a MENU_USERS=()
                 for u in $LISTA_USERS; do
-                    MENU_USERS="$MENU_USERS $u Usuario_Samba"
+                    MENU_USERS+=("$u" "Usuario_Samba")
                 done
                 TARGET_USER=$(whiptail --title "Modificar Grupos de Usuario" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el usuario al que deseas modificar los grupos:" 16 68 6 \
-                    $MENU_USERS 3>&1 1>&2 2>&3)
+                    "${MENU_USERS[@]}" 3>&1 1>&2 2>&3)
                 RET=$?
                 if [ $RET -eq 0 ] && [ -n "$TARGET_USER" ]; then
                     GRUPOS_DISP=$(awk -F: '$1 ~ /^grp_/ {print $1}' /etc/group | sort -u)
-                    LISTA_OPC=""
+                    local -a LISTA_OPC=()
                     GRPS_ACTUALES=$(id -Gn "$TARGET_USER" 2>/dev/null)
                     for g in $GRUPOS_DISP; do
                         [ "$g" == "$TARGET_USER" ] && continue
                         STATUS="OFF"
                         if echo "$GRPS_ACTUALES" | grep -qw "$g"; then STATUS="ON"; fi
-                        LISTA_OPC="$LISTA_OPC $g Grupo_$g $STATUS"
+                        LISTA_OPC+=("$g" "Grupo_$g" "$STATUS")
                     done
                     NUEVOS_GRPS=$(whiptail --title "Modificar Grupos de $TARGET_USER" \
                         --ok-button "< Guardar >" --cancel-button "< Cancelar >" \
                         --checklist "Marca con ESPACIO los grupos asignados a $TARGET_USER:" 18 72 8 \
-                        $LISTA_OPC 3>&1 1>&2 2>&3)
+                        "${LISTA_OPC[@]}" 3>&1 1>&2 2>&3)
                     RET=$?
                     if [ $RET -eq 0 ]; then
                         NUEVOS_GRPS_CSV=$(echo "$NUEVOS_GRPS" | tr -d '\"' | tr ' ' ',')
@@ -318,14 +318,14 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     whiptail --ok-button "< Aceptar >" --msgbox "No hay usuarios registrados." 8 45
                     continue
                 fi
-                MENU_USERS=""
+                local -a MENU_USERS=()
                 for u in $LISTA_USERS; do
-                    MENU_USERS="$MENU_USERS $u Usuario_Samba"
+                    MENU_USERS+=("$u" "Usuario_Samba")
                 done
                 USER_PW_SEL=$(whiptail --title "Cambiar Contraseña Samba" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el usuario para cambiar su contraseña:" 16 68 6 \
-                    $MENU_USERS 3>&1 1>&2 2>&3)
+                    "${MENU_USERS[@]}" 3>&1 1>&2 2>&3)
                 RET=$?
                 if [ $RET -eq 0 ] && [ -n "$USER_PW_SEL" ]; then
                     NUEVA_CLAVE=$(whiptail --title "Nueva Contraseña" \
@@ -349,14 +349,14 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     whiptail --ok-button "< Aceptar >" --msgbox "No hay usuarios disponibles para eliminar." 8 45
                     continue
                 fi
-                MENU_USERS=""
+                local -a MENU_USERS=()
                 for u in $LISTA_USERS; do
-                    MENU_USERS="$MENU_USERS $u Usuario_Samba"
+                    MENU_USERS+=("$u" "Usuario_Samba")
                 done
                 USER_DEL_SEL=$(whiptail --title "Eliminar Usuario" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el usuario que deseas eliminar:" 16 68 6 \
-                    $MENU_USERS 3>&1 1>&2 2>&3)
+                    "${MENU_USERS[@]}" 3>&1 1>&2 2>&3)
                 RET=$?
                 if [ $RET -eq 0 ] && [ -n "$USER_DEL_SEL" ]; then
                     if (whiptail --title "Confirmación de Eliminación" \
