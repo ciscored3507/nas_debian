@@ -14,7 +14,8 @@ gestionar_grupos() {
             "3" "[-] Eliminar un grupo existente" \
             "4" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
 
-        if [ $? -ne 0 ] || [ "$OPC_GRP" == "4" ]; then
+        RET=$?
+        if [ $RET -ne 0 ] || [ "$OPC_GRP" == "4" ]; then
             break
         fi
 
@@ -52,7 +53,8 @@ print("└─{}─┴─{}─┴─{}─┘".format("─"*w_name, "─"*w_gid, "
                 NUEVO_GRP=$(whiptail --title "$APP_TITLE" \
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --inputbox "Ingresa el nombre del grupo (ej. grp_contabilidad o grp_ventas):" 10 65 "grp_" 3>&1 1>&2 2>&3)
-                if [ $? -eq 0 ] && [ -n "$NUEVO_GRP" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$NUEVO_GRP" ]; then
                     NUEVO_GRP=$(echo "$NUEVO_GRP" | tr ' ' '_' | tr -cd 'a-z0-9_-')
                     if [[ "$NUEVO_GRP" != grp_* ]]; then
                         NUEVO_GRP="grp_${NUEVO_GRP}"
@@ -85,7 +87,8 @@ print("└─{}─┴─{}─┴─{}─┘".format("─"*w_name, "─"*w_gid, "
                     --menu "Selecciona el grupo que deseas eliminar:" 16 68 6 \
                     $MENU_ELIM 3>&1 1>&2 2>&3)
 
-                if [ $? -eq 0 ] && [ -n "$GRP_BORRAR" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$GRP_BORRAR" ]; then
                     if (whiptail --title "Confirmar Eliminación" \
                         --yes-button "< Sí, Eliminar >" --no-button "< Cancelar >" \
                         --yesno "¿Estás seguro de que deseas eliminar el grupo \"$GRP_BORRAR\"?" 8 60); then
