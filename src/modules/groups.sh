@@ -36,12 +36,12 @@ w_name = max(max(len(g[0]) for g in groups), 20)
 w_gid  = max(max(len(g[1]) for g in groups), 6)
 w_mem  = max(max(len(g[2]) for g in groups), 28)
 
-print(f"┌─{"─"*w_name}─┬─{"─"*w_gid}─┬─{"─"*w_mem}─┐")
-print(f"│ {"NOMBRE DEL GRUPO".ljust(w_name)} │ {"GID".ljust(w_gid)} │ {"USUARIOS MIEMBROS".ljust(w_mem)} │")
-print(f"├─{"─"*w_name}─┼─{"─"*w_gid}─┼─{"─"*w_mem}─┤")
+print(f"┌─{2*w_name}─┬─{"─"*w_gid}─┬─{"─"*w_mem}─┐")
+print(f"│ {2.ljust(w_name)} │ {"GID".ljust(w_gid)} │ {"USUARIOS MIEMBROS".ljust(w_mem)} │")
+print(f"├─{2*w_name}─┼─{"─"*w_gid}─┼─{"─"*w_mem}─┤")
 for gname, gid, members in sorted(groups, key=lambda x: x[0]):
     print(f"│ {gname.ljust(w_name)} │ {gid.ljust(w_gid)} │ {members.ljust(w_mem)} │")
-print(f"└─{"─"*w_name}─┴─{"─"*w_gid}─┴─{"─"*w_mem}─┘")
+print(f"└─{2*w_name}─┴─{"─"*w_gid}─┴─{"─"*w_mem}─┘")
 ')
                 whiptail --title "CRUD: Grupos de Seguridad" --ok-button "< Aceptar >" \
                     --msgbox "$TABLA_GRUPOS" 18 76

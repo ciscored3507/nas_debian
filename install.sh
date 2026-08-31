@@ -8,6 +8,9 @@
 
 set -e
 
+# Evitar que git pida contraseñas interactivamente y congele el script
+export GIT_TERMINAL_PROMPT=0
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="/opt/nas_debian"
 BIN_PATH="/usr/local/bin/nas"
@@ -53,7 +56,7 @@ clear 2>/dev/null || true
 echo -e "${C_CYAN}"
 echo "  ╭──────────────────────────────────────────────────────────────────────────╮"
 echo "  │        INSTALADOR OFICIAL • SERVIDOR NAS & BACKUP EAD-COL (DEBIAN 13)    │"
-echo "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+echo -e "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
 
 echo -e " ${C_BOLD}[1/4]${C_RESET} Verificando e instalando herramientas base (git, curl, whiptail)..."
 DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null 2>&1 || true
@@ -74,7 +77,7 @@ else
     git clone -q "$REPO_URL" "$INSTALL_DIR"
 fi
 
-chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR"/src/*.sh "$INSTALL_DIR"/src/**/*.sh 2>/dev/null || true
+find "$INSTALL_DIR" -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
 git config --system --add safe.directory "$INSTALL_DIR" 2>/dev/null || git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
 echo -e " ${C_BOLD}[3/4]${C_RESET} Creando comando global del sistema ${C_GREEN}nas${C_RESET} en ${C_WHITE}$BIN_PATH${C_RESET}..."
@@ -88,6 +91,8 @@ if [ "$EUID" -ne 0 ]; then
     echo "[-] El comando 'nas' requiere privilegios de administrador. Ejecuta: sudo nas $@"
     exit 1
 fi
+
+export GIT_TERMINAL_PROMPT=0
 
 git config --system --add safe.directory "$INSTALL_DIR" 2>/dev/null || git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
 
@@ -105,13 +110,13 @@ case "$1" in
                 echo "✔ Ya tienes la última versión instalada ($(git log -1 --format='%h - %s (%cd)' --date=short))."
             else
                 git reset --hard origin/main
-                chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR"/src/*.sh "$INSTALL_DIR"/src/**/*.sh 2>/dev/null || true
+                find "$INSTALL_DIR" -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
                 echo "✔ ¡Actualización completada con éxito a la versión $(git log -1 --format='%h - %s')!"
             fi
         else
             echo "[-] Error: No se encontró el repositorio en $INSTALL_DIR. Reinstalando..."
             git clone "$REPO_URL" "$INSTALL_DIR"
-            chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR"/src/*.sh "$INSTALL_DIR"/src/**/*.sh 2>/dev/null || true
+            find "$INSTALL_DIR" -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
         fi
         exit 0
         ;;

@@ -9,7 +9,7 @@ diagnostico_nas() {
     echo -e "${C_CYAN}"
     echo "  ╭──────────────────────────────────────────────────────────────────────────╮"
     echo "  │               DIAGNÓSTICO EN VIVO • SERVIDOR ($SERVER_IP)                │"
-    echo "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
+    echo -e "  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}\n"
 
     echo -e "  ${C_BOLD}${C_WHITE}1. ESTADO DE SERVICIOS EN TIEMPO REAL:${C_RESET}"
     for s in smbd nmbd wsdd2 cockpit.socket cron; do
@@ -41,7 +41,8 @@ diagnostico_nas() {
     for b in /etc/cron.d/backup_*; do
         if [ -f "$b" ]; then
             has_bkp=true
-            echo -e "     [⏱] ${C_CYAN}$(basename "$b" | sed "s/backup_//"):${C_RESET} ${C_WHITE}$(cat "$b")${C_RESET}"
+            local c_expr=$(awk '{print $1,$2,$3,$4,$5}' "$b")
+            echo -e "     [⏱] ${C_CYAN}$(basename "$b" | sed "s/backup_//"):${C_RESET} ${C_WHITE}${c_expr}${C_RESET}"
         fi
     done
     if [ "$has_bkp" = false ]; then

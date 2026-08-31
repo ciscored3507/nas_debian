@@ -41,14 +41,14 @@ actualizar_desde_git() {
                     --yes-button "< Actualizar Ahora >" --no-button "< Cancelar >" \
                     --yesno "Hay una nueva versión disponible en GitHub:\n\n$changelog\n\n¿Deseas descargar e instalar la actualización ahora?" 15 72); then
                     git reset --hard origin/main
-                    chmod +x "$PROJECT_ROOT"/*.sh "$PROJECT_ROOT"/src/**/*.sh 2>/dev/null || true
+                    find "$PROJECT_ROOT" -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
                     whiptail --title "$APP_TITLE" --ok-button "< Reiniciar Asistente >" \
                         --msgbox "✔ ¡Actualización instalada con éxito!\n\nEl asistente se reiniciará con las nuevas mejoras." 9 65
-                    exec bash "$PROJECT_ROOT/asistente_nas.sh"
+                    exec bash "$PROJECT_ROOT/src/asistente.sh"
                 fi
             else
                 git reset --hard origin/main
-                chmod +x "$PROJECT_ROOT"/*.sh "$PROJECT_ROOT"/src/**/*.sh 2>/dev/null || true
+                find "$PROJECT_ROOT" -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
                 echo -e "${C_GREEN}✔ ¡Actualización completada con éxito a la versión $(git log -1 --format='%h - %s')!${C_RESET}"
             fi
         fi

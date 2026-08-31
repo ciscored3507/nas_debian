@@ -80,12 +80,12 @@ w_vis  = max(max(len(r[2]) for r in rows), 11)
 w_perm = max(max(len(r[3]) for r in rows), 12)
 w_path = max(max(len(r[4]) for r in rows), 20)
 
-print(f"┌─{"─"*w_name}─┬─{"─"*w_est}─┬─{"─"*w_vis}─┬─{"─"*w_perm}─┬─{"─"*w_path}─┐")
-print(f"│ {"RECURSO".ljust(w_name)} │ {"ESTADO".ljust(w_est)} │ {"VISIBILIDAD".ljust(w_vis)} │ {"PERMISOS".ljust(w_perm)} │ {"RUTA EN DISCO".ljust(w_path)} │")
-print(f"├─{"─"*w_name}─┼─{"─"*w_est}─┼─{"─"*w_vis}─┼─{"─"*w_perm}─┼─{"─"*w_path}─┤")
+print(f"┌─{\x27─\x27*w_name}─┬─{\x27─\x27*w_est}─┬─{\x27─\x27*w_vis}─┬─{\x27─\x27*w_perm}─┬─{\x27─\x27*w_path}─┐")
+print(f"│ {\x27RECURSO\x27.ljust(w_name)} │ {\x27ESTADO\x27.ljust(w_est)} │ {\x27VISIBILIDAD\x27.ljust(w_vis)} │ {\x27PERMISOS\x27.ljust(w_perm)} │ {\x27RUTA EN DISCO\x27.ljust(w_path)} │")
+print(f"├─{\x27─\x27*w_name}─┼─{\x27─\x27*w_est}─┼─{\x27─\x27*w_vis}─┼─{\x27─\x27*w_perm}─┼─{\x27─\x27*w_path}─┤")
 for r in rows:
     print(f"│ {r[0].ljust(w_name)} │ {r[1].ljust(w_est)} │ {r[2].ljust(w_vis)} │ {r[3].ljust(w_perm)} │ {r[4].ljust(w_path)} │")
-print(f"└─{"─"*w_name}─┴─{"─"*w_est}─┴─{"─"*w_vis}─┴─{"─"*w_perm}─┴─{"─"*w_path}─┘")
+print(f"└─{\x27─\x27*w_name}─┴─{\x27─\x27*w_est}─┴─{\x27─\x27*w_vis}─┴─{\x27─\x27*w_perm}─┴─{\x27─\x27*w_path}─┘")
 ')
                 whiptail --title "CRUD: Recursos Compartidos (Samba)" --ok-button "< Aceptar >" --msgbox "$TABLA_SHARES" 20 78
                 ;;
