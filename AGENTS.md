@@ -25,6 +25,7 @@
     * `docs: <descripción en español>` (documentación)
     * `refactor: <descripción en español>` (mejoras de código)
     * `ci: <descripción en español>` (cambios en integración continua)
+  * **REGLA DE INTEGRACIÓN CONTINUA (CI):** Cada *push* debe validar el CI de GitHub Actions. En caso de fallo, se debe corregir el código y volver a validar. **Bajo ninguna circunstancia se pueden utilizar directivas para ignorar advertencias en el CI** (`# shellcheck disable` o banderas `-e`). El código debe ajustarse a la regla, no la regla al código.
 
 ---
 
