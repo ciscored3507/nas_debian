@@ -18,11 +18,13 @@
   * Usuario: `nas` / `root`
   * Contraseña predeterminada: `DE0puFvp85#`
 * **Convención de Commits de Git:**
+  * **REGLA ESTRICTA:** Los commits deben ser atómicos y granulares. **Debe existir un commit independiente por cada archivo modificado.** Si se alteran 3 archivos, se deben registrar 3 commits por separado.
   * Todos los mensajes de commit deben redactarse en **español** siguiendo el estándar convencional:
     * `feat: <descripción en español>` (nuevas características)
     * `fix: <descripción en español>` (corrección de errores)
     * `docs: <descripción en español>` (documentación)
     * `refactor: <descripción en español>` (mejoras de código)
+    * `ci: <descripción en español>` (cambios en integración continua)
 
 ---
 
