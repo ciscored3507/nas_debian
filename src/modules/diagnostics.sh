@@ -4,6 +4,7 @@
 # ==============================================================================
 
 diagnostico_nas() {
+    local SERVER_IP s found_share r has_bkp b c_expr
     SERVER_IP=$(obtener_ip_local)
     clear 2>/dev/null || true
     echo -e "${C_CYAN}"

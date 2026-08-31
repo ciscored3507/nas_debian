@@ -4,6 +4,8 @@
 # ==============================================================================
 
 gestionar_backups() {
+    local OPC_BKP TABLA_BKPS TIPO_BKP TASK_NAME WIN_IP WIN_SHARE WIN_USER WIN_PASS LNX_IP LNX_PORT LNX_USER LNX_PASS LNX_PATH LOC_SRC
+    local CRON_SCHED CRON_EXPR RETENTION CRED_FILE RUNNER TAREAS_DEL MENU_DEL TASK_DEL_SEL TEST_CONN b
     while true; do
         OPC_BKP=$(whiptail --title "$APP_TITLE" \
             --ok-button "< Seleccionar >" --cancel-button "< Volver >" \

@@ -3,14 +3,14 @@
 # Motor de Auto-Actualización desde GitHub
 # ==============================================================================
 
-set -e
-
+# set -e eliminado porque infecta a todo el asistente cuando se importa con source
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)"
 source "$LIB_DIR/colors.sh" 2>/dev/null || true
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 actualizar_desde_git() {
+    local CURRENT_REV REMOTE_REV
     clear 2>/dev/null || true
     echo -e "${C_CYAN}"
     echo "  ╭──────────────────────────────────────────────────────────────────────────╮"

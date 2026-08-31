@@ -17,6 +17,16 @@ if [ "$EUID" -ne 0 ]; then
     echo "    Ejecuta: sudo nas  o  sudo bash $0"
     exit 1
 fi
+# Validar tamaño mínimo de la terminal (Whiptail requiere espacio)
+if [ -t 0 ]; then
+    filas=$(tput lines 2>/dev/null || echo 24)
+    cols=$(tput cols 2>/dev/null || echo 80)
+    if [ "$filas" -lt 18 ] || [ "$cols" -lt 70 ]; then
+        echo -e "\033[1;33m[!] Tu terminal es muy pequeña ($cols x $filas).\033[0m"
+        echo -e "    Maximiza la ventana (Mínimo recomendado: 72x20) para ejecutar el asistente."
+        exit 1
+    fi
+fi
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

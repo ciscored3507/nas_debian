@@ -4,6 +4,7 @@
 # ==============================================================================
 
 gestionar_grupos() {
+    local OPC_GRP TABLA_GRUPOS NUEVO_GRP GRUPOS_ELIM MENU_ELIM GRP_BORRAR g
     while true; do
         OPC_GRP=$(whiptail --title "$APP_TITLE" \
             --ok-button "< Seleccionar >" --cancel-button "< Volver >" \

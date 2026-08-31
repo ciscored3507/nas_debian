@@ -4,6 +4,10 @@
 # ==============================================================================
 
 instalar_nas() {
+    local SERVER_IP DEFAULT_USER DEFAULT_NETBIOS DEFAULT_WG ROL_OPCION ROL_SERVER ROL_NETBIOS ROOT_DEV ROOT_DISK
+    local MENU_DISCOS DISCO_SELECCIONADO SMB_NETBIOS SMB_WORKGROUP USUARIO_ACTUAL OPCION_USER ADMIN_USER ADMIN_PASS
+    local RESUMEN CORE_DEPLOY name size type mount dev_path
+    
     SERVER_IP=$(obtener_ip_local)
     DEFAULT_USER=$(detect_default_user)
     DEFAULT_NETBIOS=$(obtener_netbios_defecto)

@@ -4,6 +4,7 @@
 # ==============================================================================
 
 crear_usuario_guiado() {
+    local SERVER_IP USER_NAME FULL_NAME GRUPOS_DISP LISTA_OPCIONES GRUPOS_SELEC GRUPO_FINAL USER_PW SHELL_TYPE PERM_TXT STATUS g
     SERVER_IP=$(obtener_ip_local)
 
     # 1. Nombre de usuario
@@ -104,6 +105,7 @@ crear_usuario_guiado() {
 }
 
 alternar_estado_usuario() {
+    local LISTA_USERS MENU_ITEMS USER_SEL IS_DISABLED u
     LISTA_USERS=$(pdbedit -L 2>/dev/null | cut -d: -f1 | grep -v "^root$")
     if [ -z "$LISTA_USERS" ]; then
         whiptail --ok-button "< Aceptar >" --msgbox "No hay usuarios registrados en Samba." 8 45
@@ -159,6 +161,8 @@ for u, data in users.items():
 }
 
 gestionar_usuarios() {
+    local OPC_USR TABLA_USERS LISTA_USERS MENU_USERS TARGET_USER GRUPOS_DISP LISTA_OPC GRPS_ACTUALES NUEVOS_GRPS NUEVOS_GRPS_CSV
+    local USER_PW_SEL NUEVA_CLAVE USER_DEL_SEL u g g_prev
     while true; do
         OPC_USR=$(whiptail --title "$APP_TITLE" \
             --ok-button "< Seleccionar >" --cancel-button "< Volver >" \
