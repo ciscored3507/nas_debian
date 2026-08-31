@@ -11,7 +11,8 @@ crear_usuario_guiado() {
     USER_NAME=$(whiptail --title "Paso 1 de 4: Nombre de Usuario" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --inputbox "Ingresa el identificador de usuario para la red (ej. carlos_m):" 10 65 3>&1 1>&2 2>&3)
-    if [ $? -ne 0 ] || [ -z "$USER_NAME" ]; then return; fi
+    RET=$?
+    if [ $RET -ne 0 ] || [ -z "$USER_NAME" ]; then return; fi
 
     if ! [[ "$USER_NAME" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
         whiptail --title "Error de Formato" --ok-button "< Aceptar >" \
@@ -29,7 +30,8 @@ crear_usuario_guiado() {
     FULL_NAME=$(whiptail --title "Paso 2 de 4: Nombre Real y Cargo" \
         --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
         --inputbox "Nombre completo y departamento/cargo del empleado:" 10 65 "Empleado EAD" 3>&1 1>&2 2>&3)
-    if [ $? -ne 0 ]; then return; fi
+    RET=$?
+    if [ $RET -ne 0 ]; then return; fi
     FULL_NAME=${FULL_NAME:-"Empleado EAD"}
 
     # 3. Selección de Grupos de Seguridad (grp_*)
@@ -53,7 +55,8 @@ crear_usuario_guiado() {
         --checklist "Marca con la BARRA ESPACIADORA [X] los grupos a los que pertenecerá '$USER_NAME':" 18 74 8 \
         $LISTA_OPCIONES 3>&1 1>&2 2>&3)
 
-    if [ $? -ne 0 ] || [ -z "$GRUPOS_SELEC" ]; then
+    RET=$?
+    if [ $RET -ne 0 ] || [ -z "$GRUPOS_SELEC" ]; then
         whiptail --title "Aviso" --ok-button "< Aceptar >" --msgbox "Debes seleccionar al menos un grupo para el usuario." 8 50
         return
     fi
@@ -65,7 +68,8 @@ crear_usuario_guiado() {
         USER_PW=$(whiptail --title "Paso 4 de 4: Contraseña de Red Samba" \
             --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
             --passwordbox "Ingresa la contraseña de red Samba para $USER_NAME:" 10 65 3>&1 1>&2 2>&3)
-        if [ $? -ne 0 ]; then return; fi
+        RET=$?
+        if [ $RET -ne 0 ]; then return; fi
         if [ -n "$USER_PW" ]; then break; fi
         whiptail --title "Error" --ok-button "< Aceptar >" --msgbox "La contraseña no puede estar vacía." 8 45
     done
@@ -137,7 +141,8 @@ for u, data in users.items():
         --menu "Selecciona el usuario para suspender o reactivar su acceso a la red:" 18 72 8 \
         $MENU_ITEMS 3>&1 1>&2 2>&3)
 
-    if [ $? -eq 0 ] && [ -n "$USER_SEL" ]; then
+    RET=$?
+    if [ $RET -eq 0 ] && [ -n "$USER_SEL" ]; then
         IS_DISABLED=$(pdbedit -v -u "$USER_SEL" 2>/dev/null | grep "Account Flags:" | grep -q "D" && echo "yes" || echo "no")
         
         if [ "$IS_DISABLED" == "yes" ]; then
@@ -175,7 +180,8 @@ gestionar_usuarios() {
             "6" "[-] Eliminar un Usuario del Sistema" \
             "7" "[<] Volver al Menú Principal" 3>&1 1>&2 2>&3)
 
-        if [ $? -ne 0 ] || [ "$OPC_USR" == "7" ]; then
+        RET=$?
+        if [ $RET -ne 0 ] || [ "$OPC_USR" == "7" ]; then
             break
         fi
 
@@ -265,7 +271,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el usuario al que deseas modificar los grupos:" 16 68 6 \
                     $MENU_USERS 3>&1 1>&2 2>&3)
-                if [ $? -eq 0 ] && [ -n "$TARGET_USER" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$TARGET_USER" ]; then
                     GRUPOS_DISP=$(awk -F: '$1 ~ /^grp_/ {print $1}' /etc/group | sort -u)
                     LISTA_OPC=""
                     GRPS_ACTUALES=$(id -Gn "$TARGET_USER" 2>/dev/null)
@@ -279,7 +286,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                         --ok-button "< Guardar >" --cancel-button "< Cancelar >" \
                         --checklist "Marca con ESPACIO los grupos asignados a $TARGET_USER:" 18 72 8 \
                         $LISTA_OPC 3>&1 1>&2 2>&3)
-                    if [ $? -eq 0 ]; then
+                    RET=$?
+                    if [ $RET -eq 0 ]; then
                         NUEVOS_GRPS_CSV=$(echo "$NUEVOS_GRPS" | tr -d '\"' | tr ' ' ',')
                         if [ -n "$NUEVOS_GRPS_CSV" ]; then
                             # Remover de grupos grp_* previos
@@ -318,11 +326,13 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el usuario para cambiar su contraseña:" 16 68 6 \
                     $MENU_USERS 3>&1 1>&2 2>&3)
-                if [ $? -eq 0 ] && [ -n "$USER_PW_SEL" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$USER_PW_SEL" ]; then
                     NUEVA_CLAVE=$(whiptail --title "Nueva Contraseña" \
                         --ok-button "< Cambiar >" --cancel-button "< Cancelar >" \
                         --passwordbox "Ingresa la nueva contraseña de Samba para $USER_PW_SEL:" 10 65 3>&1 1>&2 2>&3)
-                    if [ $? -eq 0 ] && [ -n "$NUEVA_CLAVE" ]; then
+                    RET=$?
+                    if [ $RET -eq 0 ] && [ -n "$NUEVA_CLAVE" ]; then
                         echo -e "${NUEVA_CLAVE}\n${NUEVA_CLAVE}" | smbpasswd -s "$USER_PW_SEL"
                         if id -Gn "$USER_PW_SEL" 2>/dev/null | grep -qw "grp_sistemas"; then
                             echo "${USER_PW_SEL}:${NUEVA_CLAVE}" | chpasswd 2>/dev/null || true
@@ -347,7 +357,8 @@ print("└─{}─┴─{}─┴─{}─┴─{}─┴─{}─┘".format("─"*
                     --ok-button "< Siguiente >" --cancel-button "< Cancelar >" \
                     --menu "Selecciona el usuario que deseas eliminar:" 16 68 6 \
                     $MENU_USERS 3>&1 1>&2 2>&3)
-                if [ $? -eq 0 ] && [ -n "$USER_DEL_SEL" ]; then
+                RET=$?
+                if [ $RET -eq 0 ] && [ -n "$USER_DEL_SEL" ]; then
                     if (whiptail --title "Confirmación de Eliminación" \
                         --yes-button "< Sí, Eliminar >" --no-button "< Cancelar >" \
                         --yesno "¿Estás seguro de eliminar al usuario '$USER_DEL_SEL' de Samba y Linux?" 10 60); then
