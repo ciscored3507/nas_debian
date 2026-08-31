@@ -31,18 +31,27 @@ fi
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Cargar librerías del sistema
+# shellcheck source=src/lib/colors.sh
 source "$SRC_DIR/lib/colors.sh"
+# shellcheck source=src/lib/helpers.sh
 source "$SRC_DIR/lib/helpers.sh"
 
 # Cargar motores del núcleo
+# shellcheck source=src/core/updater.sh
 source "$SRC_DIR/core/updater.sh"
 
 # Cargar módulos del menú
+# shellcheck source=src/modules/deploy_wizard.sh
 source "$SRC_DIR/modules/deploy_wizard.sh"
+# shellcheck source=src/modules/groups.sh
 source "$SRC_DIR/modules/groups.sh"
+# shellcheck source=src/modules/shares.sh
 source "$SRC_DIR/modules/shares.sh"
+# shellcheck source=src/modules/backups.sh
 source "$SRC_DIR/modules/backups.sh"
+# shellcheck source=src/modules/users.sh
 source "$SRC_DIR/modules/users.sh"
+# shellcheck source=src/modules/diagnostics.sh
 source "$SRC_DIR/modules/diagnostics.sh"
 
 # Si se pasa el argumento --status, mostrar diagnóstico directo
