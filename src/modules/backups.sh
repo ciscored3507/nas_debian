@@ -226,7 +226,7 @@ RUNNER_EOF
                 chmod 750 "$RUNNER"
 
                 # Programar en Cron
-                echo "$CRON_EXPR root $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
+                echo "$CRON_EXPR root systemd-run --unit=backup-${TASK_NAME} --slice=backups.slice -p CPUSchedulingPolicy=batch -p IOSchedulingClass=idle bash $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
                 chmod 644 "/etc/cron.d/backup_${TASK_NAME}"
 
                 whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
@@ -349,7 +349,7 @@ RUNNER_EOF
                 sed -i "s|RETENTION_PLACEHOLDER|$RETENTION|g" "$RUNNER"
                 chmod 750 "$RUNNER"
 
-                echo "$CRON_EXPR root $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
+                echo "$CRON_EXPR root systemd-run --unit=backup-${TASK_NAME} --slice=backups.slice -p CPUSchedulingPolicy=batch -p IOSchedulingClass=idle bash $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
                 chmod 644 "/etc/cron.d/backup_${TASK_NAME}"
 
                 whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
@@ -421,7 +421,7 @@ RUNNER_EOF
                 sed -i "s|RETENTION_PLACEHOLDER|$RETENTION|g" "$RUNNER"
                 chmod 750 "$RUNNER"
 
-                echo "$CRON_EXPR root $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
+                echo "$CRON_EXPR root systemd-run --unit=backup-${TASK_NAME} --slice=backups.slice -p CPUSchedulingPolicy=batch -p IOSchedulingClass=idle bash $RUNNER >/dev/null 2>&1" > "/etc/cron.d/backup_${TASK_NAME}"
                 chmod 644 "/etc/cron.d/backup_${TASK_NAME}"
 
                 whiptail --title "$APP_TITLE" --ok-button "< Aceptar >" \
