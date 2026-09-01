@@ -33,9 +33,59 @@ echo "==========================================================================
 echo " [1/9] Actualizando repositorios e instalando paquetes base..."
 DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null 2>&1 || true
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    samba samba-common-bin wsdd2 smbclient \
+    samba samba-common-bin wsdd2 smbclient samba-vfs-modules \
     cockpit cockpit-storaged cockpit-networkmanager cockpit-packagekit \
-    cifs-utils rsync sshpass cron parted ufw >/dev/null 2>&1
+    cifs-utils rsync sshpass cron parted ufw btrfs-progs >/dev/null 2>&1
+
+auto_tune_hardware() {
+    local DISCO="$1"
+    local DISCO_BASE=$(basename "$DISCO")
+    local ES_HDD=$(cat "/sys/block/$DISCO_BASE/queue/rotational" 2>/dev/null || echo "1")
+    local RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+    local CORES=$(nproc)
+
+    # 1. Ajuste de CPU (Compresión Zstd)
+    local BTRFS_COMPRESS="zstd:1"
+    if [ "$CORES" -ge 8 ]; then
+        BTRFS_COMPRESS="zstd:5"
+    elif [ "$CORES" -ge 3 ]; then
+        BTRFS_COMPRESS="zstd:3"
+    fi
+
+    # 2. Ajuste de Disco (HDD vs SSD)
+    BTRFS_OPTS="rw,noatime,compress=$BTRFS_COMPRESS,space_cache=v2"
+    if [ "$ES_HDD" -eq 1 ]; then
+        BTRFS_OPTS="$BTRFS_OPTS,autodefrag"
+        READAHEAD_KB=4096
+    else
+        BTRFS_OPTS="$BTRFS_OPTS,ssd,discard=async"
+        READAHEAD_KB=1024
+    fi
+
+    # 3. Ajuste de RAM (Sysctl Dirty Bytes)
+    local DIRTY_BYTES=$((256 * 1024 * 1024)) # Default 256MB
+    if [ "$RAM_KB" -gt 8388608 ]; then # > 8GB
+        DIRTY_BYTES=$((1024 * 1024 * 1024)) # 1GB
+    elif [ "$RAM_KB" -gt 4194304 ]; then # > 4GB
+        DIRTY_BYTES=$((512 * 1024 * 1024)) # 512MB
+    fi
+    local DIRTY_BG_BYTES=$((DIRTY_BYTES / 2))
+
+    # Escribir Sysctl Dinámico
+    cat <<EOF > /etc/sysctl.d/99-nas-tuning.conf
+vm.swappiness = 10
+vm.vfs_cache_pressure = 50
+vm.dirty_bytes = $DIRTY_BYTES
+vm.dirty_background_bytes = $DIRTY_BG_BYTES
+EOF
+    sysctl -p /etc/sysctl.d/99-nas-tuning.conf >/dev/null 2>&1 || true
+
+    # Aplicar Readahead
+    blockdev --setra $((READAHEAD_KB * 2)) "$DISCO" 2>/dev/null || true
+
+    # Exportar variables para usarlas en el formateo
+    export BTRFS_OPTS
+}
 
 echo " [2/9] Configurando almacenamiento (/srv/nas) en $TARGET_DISK..."
 mkdir -p /srv/nas
@@ -46,10 +96,13 @@ ROOT_DISK=$(lsblk -no PKNAME "$ROOT_DEV" 2>/dev/null || echo "")
 
 if [ "$TARGET_DISK" == "LOCAL" ] || [ "$TARGET_DISK" == "$ROOT_DEV" ] || [ "$TARGET_DISK" == "$ROOT_DISK" ]; then
     echo "  -> Almacenamiento local configurado en la partición raíz."
+    auto_tune_hardware "$ROOT_DEV"
 else
     echo "  -> Inicializando y formateando disco dedicado: $TARGET_DISK"
+    auto_tune_hardware "$TARGET_DISK"
+    
     umount "$TARGET_DISK"* 2>/dev/null || true
-    parted -s "$TARGET_DISK" mklabel gpt mkpart primary ext4 0% 100%
+    parted -s "$TARGET_DISK" mklabel gpt mkpart primary btrfs 0% 100%
     partprobe "$TARGET_DISK" 2>/dev/null || true
     sleep 2
 
@@ -57,16 +110,16 @@ else
     [ ! -b "$PART_NAS" ] && PART_NAS="${TARGET_DISK}p1"
     [ ! -b "$PART_NAS" ] && PART_NAS="$TARGET_DISK"
 
-    mkfs.ext4 -F -L "NAS_DATA" "$PART_NAS"
+    mkfs.btrfs -f -L "NAS_DATA" "$PART_NAS"
     UUID_NAS=$(blkid -s UUID -o value "$PART_NAS")
 
     sed -i '\|/srv/nas|d' /etc/fstab
     if [ -n "$UUID_NAS" ]; then
-        echo "UUID=$UUID_NAS /srv/nas ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+        echo "UUID=$UUID_NAS /srv/nas btrfs defaults,$BTRFS_OPTS 0 2" >> /etc/fstab
     else
-        echo "$PART_NAS /srv/nas ext4 defaults,noatime,nofail 0 2" >> /etc/fstab
+        echo "$PART_NAS /srv/nas btrfs defaults,$BTRFS_OPTS 0 2" >> /etc/fstab
     fi
-    mount -a || mount /srv/nas 2>/dev/null || true
+    mount -o "$BTRFS_OPTS" "$PART_NAS" /srv/nas 2>/dev/null || mount /srv/nas 2>/dev/null || true
 fi
 
 echo " [3/9] Instalando extensiones de Cockpit (File Sharing, Identities, Navigator)..."
@@ -208,6 +261,14 @@ cat << SMBCONF > /etc/samba/smb.conf
    server smb encrypt = desired
    dns proxy = no
    include = registry
+
+   # Optimizaciones de Rendimiento y Red (Auto-Tuning)
+   use sendfile = yes
+   min receivefile size = 16384
+   aio read size = 16384
+   aio write size = 16384
+   vfs objects = io_uring
+   socket options = TCP_NODELAY IPTOS_LOWDELAY
 
    log file = /var/log/samba/log.%m
    max log size = 1000
