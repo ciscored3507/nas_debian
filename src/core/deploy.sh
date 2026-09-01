@@ -39,10 +39,14 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
 
 auto_tune_hardware() {
     local DISCO="$1"
-    local DISCO_BASE=$(basename "$DISCO")
-    local ES_HDD=$(cat "/sys/block/$DISCO_BASE/queue/rotational" 2>/dev/null || echo "1")
-    local RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
-    local CORES=$(nproc)
+    local DISCO_BASE
+    DISCO_BASE=$(basename "$DISCO")
+    local ES_HDD
+    ES_HDD=$(cat "/sys/block/$DISCO_BASE/queue/rotational" 2>/dev/null || echo "1")
+    local RAM_KB
+    RAM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+    local CORES
+    CORES=$(nproc)
 
     # 1. Ajuste de CPU (Compresión Zstd)
     local BTRFS_COMPRESS="zstd:1"
